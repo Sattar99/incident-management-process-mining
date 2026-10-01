@@ -1,0 +1,67 @@
+feature,coefficient
+cat__issue_type_Performance Issue,-1.5246181385629
+cat__issue_type_Bug,1.4747625840850735
+cat__short_description_Application crash,0.7785100215757053
+cat__short_description_Printer not working,-0.6573364205788449
+cat__short_description_UI glitch,-0.46273165604777755
+tfidf__crash,0.4494729705235772
+tfidf__application,0.4494729705235772
+tfidf__application crash,0.4494729705235772
+cat__report_channel_Phone,-0.33748957310343275
+cat__issue_type_Incident,-0.3224024637331173
+num__created_dayofyear,0.3140796513533977
+num__created_month,-0.30422636876227704
+tfidf__working,-0.29396978410013697
+tfidf__not,-0.29396978410013697
+tfidf__not working,-0.29396978410013697
+tfidf__printer,-0.29396978410013697
+tfidf__printer not,-0.29396978410013697
+cat__reporter_Bob,-0.2911227480161957
+cat__priority_High,-0.2690424385422098
+tfidf__glitch,-0.26715824618174555
+tfidf__ui,-0.26715824618174555
+tfidf__ui glitch,-0.26715824618174555
+cat__short_description_Password reset needed,-0.219080334023495
+cat__issue_type_Technical Issue,0.21008881423793913
+cat__issue_type_Service Request,-0.182012098196468
+cat__issue_type_Feature Request,-0.16363743355984434
+cat__reporter_Charlie,-0.13600360383091892
+cat__short_description_New feature request,-0.1265691977328069
+cat__short_description_Data loss issue,0.12474892491335778
+cat__priority_Medium,-0.12180687080755237
+num__desc_length,0.10636514615622053
+tfidf__password,-0.09797570388197924
+tfidf__reset needed,-0.09797570388197924
+tfidf__password reset,-0.09797570388197924
+tfidf__reset,-0.09797570388197924
+tfidf__needed,-0.09797570388197924
+cat__report_channel_Email,-0.08778669571898633
+cat__priority_Low,-0.0817203798183855
+cat__report_channel_Website,-0.07259276300524951
+cat__reporter_Alice,-0.0702986984387651
+num__created_dow,0.06672243063972846
+cat__short_description_Unable to login,0.060377148323738514
+tfidf__feature request,-0.05660346599763528
+tfidf__new feature,-0.05660346599763528
+tfidf__request,-0.05660346599763528
+tfidf__feature,-0.05660346599763528
+tfidf__new,-0.05660346599763528
+tfidf__data,0.05578941524525519
+tfidf__issue,0.05578941524525519
+tfidf__loss issue,0.05578941524525519
+tfidf__data loss,0.05578941524525519
+tfidf__loss,0.05578941524525519
+cat__reporter_John,0.042529566544649414
+num__created_hour,0.03883724062065391
+cat__issue_type_Maintenance,0.03524904656110299
+cat__short_description_Server outage,0.029511824401904075
+tfidf__to,0.02700148158789421
+tfidf__to login,0.02700148158789421
+tfidf__unable,0.02700148158789421
+tfidf__unable to,0.02700148158789421
+tfidf__login,0.02700148158789421
+cat__report_channel_App,0.02529934265950389
+cat__reporter_Emily,-0.017674205426935173
+tfidf__server,0.01703865976270982
+tfidf__server outage,0.01703865976270982
+tfidf__outage,0.01703865976270982

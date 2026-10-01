@@ -1,0 +1,12 @@
+# Optional extras for the ML investigation (ml_triage.py).
+#
+# Kept separate from requirements.txt on purpose: the ETL -> SQL -> tests chain in
+# .github/workflows/ci.yml does NOT run the ML layer, and scikit-learn is a heavy
+# install for a CI runner that never touches it.
+#
+#   pip install -r requirements.txt -r requirements-ml.txt   # to reproduce ML_FINDINGS.md
+pandas>=2.0
+numpy>=1.26.0
+scikit-learn>=1.9      # 1.9.1 was used; `penalty=` is deprecated in this version
+matplotlib>=3.10       # Agg backend, figures written to ml_artifacts/
+seaborn>=0.13

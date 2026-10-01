@@ -1,0 +1,119 @@
+==============================================================================
+ML INTAKE TRIAGE CLASSIFIER - Incident Management (Project 2)
+==============================================================================
+run at          : 2026-10-01T02:51:09
+python          : 3.11.6  (C:\Users\mooha\AppData\Local\Programs\Python\Python311\python.exe)
+pandas 3.0.3 | numpy 1.26.4 | sklearn 1.9.1
+
+[1] Loading intake frame (first event only) + labels ...
+    31,588 cases | 2023-01-01 00:07:00 -> 2023-12-31 23:38:00
+    first-event check: all cases start with 'Ticket created' = True
+
+[2] Pre-model diagnostics ...
+    short_description: 8 distinct values across 31,588 cases (0.0253% distinct)
+    verdict: boilerplate = True
+       7,660  New feature request
+       5,804  Application crash
+       5,035  Data loss issue
+       4,295  Server outage
+       2,848  UI glitch
+       2,288  Printer not working
+       2,198  Unable to login
+       1,460  Password reset needed
+    NMI(short_description, issue_type) = 0.6055
+    customer_satisfaction: EXCLUDED from the production feature set. The score is a pos...
+
+[3] Class balance / base rates (report these BEFORE any metric):
+    reached_level_3    n=31,588  positives=1,979  base_rate=0.0626  trivial_acc=0.9374
+    escalated          n=31,588  positives=18,841  base_rate=0.5965  trivial_acc=0.5965
+    slow_24h           n=31,588  positives=5,224  base_rate=0.1654  trivial_acc=0.8346
+    cycle_time_hours: mean=15.0318  median=12.7167  p95=32.4775  max=56.3167
+    Variant 7: 1,261 cases, L3 rate 1.0000 vs 0.0237 elsewhere; it supplies 63.72% of all L3 positives
+
+[4] Building splits ...
+    chronological  train=22,112 test=9,476  test range 2023-09-12 12:33:00 -> 2023-12-31 23:38:00
+    random         train=22,112 test=9,476  test range 2023-01-01 00:07:00 -> 2023-12-31 23:15:00
+
+[5] target=reached_level_3  split=chronological
+    base rate test=0.0605 | always-negative acc=0.9395 | random-guess F1=0.0600 PR-AUC=0.0604
+    LogReg      AUC=0.8400  PR-AUC=0.4029 (lift 6.6627x)  F1@0.5=0.4577  P/R@bestF1=0.5040/0.6597 (thr=0.849)
+    HistGB      AUC=0.8438  PR-AUC=0.3769 (lift 6.2337x)  F1@0.5=0.5098  P/R@bestF1=0.5040/0.6597 (thr=0.414)
+
+    Top 10 logistic-regression features (signed, class_weight=balanced):
+      -1.5246  cat__issue_type_Performance Issue
+      +1.4748  cat__issue_type_Bug
+      +0.7785  cat__short_description_Application crash
+      -0.6573  cat__short_description_Printer not working
+      -0.4627  cat__short_description_UI glitch
+      +0.4495  tfidf__crash
+      +0.4495  tfidf__application
+      +0.4495  tfidf__application crash
+      -0.3375  cat__report_channel_Phone
+      -0.3224  cat__issue_type_Incident
+
+    saved fitted models -> ml_artifacts
+
+[5] target=escalated  split=chronological
+    base rate test=0.5952 | always-negative acc=0.4048 | random-guess F1=0.5951 PR-AUC=0.5948
+    LogReg      AUC=0.6400  PR-AUC=0.7019 (lift 1.1792x)  F1@0.5=0.4863  P/R@bestF1=0.6333/0.9426 (thr=0.355)
+    HistGB      AUC=0.6481  PR-AUC=0.7365 (lift 1.2373x)  F1@0.5=0.7378  P/R@bestF1=0.6409/0.9410 (thr=0.338)
+
+[5] target=slow_24h  split=chronological
+    base rate test=0.1690 | always-negative acc=0.8310 | random-guess F1=0.1691 PR-AUC=0.1695
+    LogReg      AUC=0.9326  PR-AUC=0.6235 (lift 3.6903x)  F1@0.5=0.7039  P/R@bestF1=0.5779/0.9450 (thr=0.772)
+    HistGB      AUC=0.9304  PR-AUC=0.6395 (lift 3.7852x)  F1@0.5=0.5526  P/R@bestF1=0.5546/0.9675 (thr=0.173)
+
+[5] target=reached_level_3  split=random
+    base rate test=0.0611 | always-negative acc=0.9389 | random-guess F1=0.0621 PR-AUC=0.0612
+    LogReg      AUC=0.8453  PR-AUC=0.3946 (lift 6.4573x)  F1@0.5=0.4622  P/R@bestF1=0.4825/0.6908 (thr=0.838)
+    HistGB      AUC=0.8494  PR-AUC=0.3804 (lift 6.2254x)  F1@0.5=0.3545  P/R@bestF1=0.4837/0.6908 (thr=0.363)
+
+[5] target=escalated  split=random
+    base rate test=0.5970 | always-negative acc=0.4030 | random-guess F1=0.5979 PR-AUC=0.5979
+    LogReg      AUC=0.6305  PR-AUC=0.6930 (lift 1.1608x)  F1@0.5=0.5200  P/R@bestF1=0.6324/0.9399 (thr=0.359)
+    HistGB      AUC=0.6436  PR-AUC=0.7392 (lift 1.2383x)  F1@0.5=0.7568  P/R@bestF1=0.6402/0.9312 (thr=0.386)
+
+[5] target=slow_24h  split=random
+    base rate test=0.1641 | always-negative acc=0.8359 | random-guess F1=0.1646 PR-AUC=0.1641
+    LogReg      AUC=0.9324  PR-AUC=0.6111 (lift 3.7238x)  F1@0.5=0.7044  P/R@bestF1=0.5576/0.9711 (thr=0.763)
+    HistGB      AUC=0.9354  PR-AUC=0.6459 (lift 3.9361x)  F1@0.5=0.6580  P/R@bestF1=0.5701/0.9286 (thr=0.332)
+
+[6] Ablations on the primary target (chronological split) ...
+    ORACLE +variant      AUC=1.0000  PR-AUC=1.0000
+    LEAKAGE +satisfaction AUC=0.8416  PR-AUC=0.4934  <- NOT USABLE AT INTAKE
+    TEXT-ONLY short_desc  AUC=0.7774  PR-AUC=0.1819
+    CATS-ONLY (rule-like) AUC=0.8408  PR-AUC=0.3928  <- what a non-ML rule could do
+    TEMPORAL-ONLY        AUC=0.5280  PR-AUC=0.0587  (expected ~0.5 if time is noise)
+    EXCL-Variant7        AUC=0.6095  PR-AUC=0.0358  (base rate 0.0233, n=9,115)
+
+[7] Cycle-time regression (secondary target) ...
+    HGB regressor  MAE=3.5927 h  R2=0.683165  Spearman=0.814709
+    baseline (predict train mean) MAE=7.0364 h  R2=-1.6e-05
+
+[8] Writing figures ...
+      wrote 4 figures + 2 CSVs to ml_artifacts/
+
+[9] INFLATION RISK ASSESSMENT
+    short_description_is_boilerplate       True
+    n_distinct_descriptions                8
+    text_only_auc                          0.777409
+    text_only_pr_auc                       0.181917
+    categorical_only_auc                   0.840777
+    temporal_only_auc                      0.527974
+    oracle_variant_auc                     1.0
+    leakage_satisfaction_auc               0.84159
+    excl_variant7_auc                      0.609516
+    excl_variant7_pr_auc                   0.03583
+
+    SPLIT SENSITIVITY (primary target, HistGB): chronological AUC=0.8438 vs random AUC=0.8494 (delta +0.0056)
+
+Wrote ml_artifacts\metrics.json
+
+==============================================================================
+METRIC TABLE - primary target reached_level_3, chronological split
+==============================================================================
+model                      AUC   PR-AUC   lift  F1@0.5   P@bf1   R@bf1    thr   Brier
+logistic_regression     0.8400   0.4029   6.66  0.4577  0.5040  0.6597  0.849  0.1257
+hist_gradient_boosting  0.8438   0.3769   6.23  0.5098  0.5040  0.6597  0.414  0.0405
+random-guess baseline   0.4989   0.0604   1.00  0.0600
+==============================================================================

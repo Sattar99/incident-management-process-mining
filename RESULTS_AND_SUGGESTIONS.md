@@ -168,9 +168,50 @@ synthetic.
 **The three long steps average 4.12 h across 2,522 transitions, contributing
 8.23 h per incident — 30.9% of the 26.64 h average.**
 
+## 5a. Variant 6 is a second deterministic L3 process — added after review
+
+*This section was not in the original analysis. It was found during adversarial
+review of the ML layer, and it corrects an omission in §5.*
+
+| | Variant 6 | Variant 7 | All others |
+|---|---:|---:|---:|
+| Incidents | 718 | 1,261 | 29,608 |
+| Mean cycle h | **18.74** | **26.64** | 14.55 |
+| Reaches L3 | **100%** | **100%** | 0% |
+| Mean events | 10 | 15 | 7.39 |
+| Mandatory rework loop | No | Yes | No |
+| Issue type | Mixed | 100% Bug | Mixed |
+
+**`reached_level_3` is an exact function of variant membership.** All 1,979 L3
+cases in the dataset are Variant 6 (718) or Variant 7 (1,261). The remaining
+**29,609 cases — 93.7% of all incidents — contain zero L3 cases**, and no variant
+has a mixed L3 outcome. Verified in `sql/05_provenance.sql`.
+
+Two consequences:
+
+1. "Predict which tickets reach L3 at intake" was never a well-posed question.
+   The answer is already carried by the variant label. An intake classifier
+   scoring AUC 0.84 was recovering a cluster membership, not forecasting.
+2. Variant 6 is a genuine operational finding, not a statistical artefact. It is
+   718 cases moving 2.4× slower than the median for a reason that has nothing to
+   do with escalation difficulty — every one of them escalates.
+
+**Why it was missed:** Variant 6's 18.74 h mean is unremarkable beside Variant 7's
+26.64 h, so it never looked like an outlier. It was sitting in
+`data/cycle_time_by_variant.csv` the whole time. The original §5 examined
+variants for *slowness*; this one is only anomalous on the L3 axis.
+
 ---
 
 ## 6. Recommendations
+
+> **Validation status — read this first.** The Strategic recommendation below is
+> **NOT validated by experiment.** It rests entirely on descriptive statistics from
+> a single year of observational data. No analysis in this project has tested
+> whether reducing intake latency or L1 attempt time actually reduces cycle time;
+> that requires a controlled before/after trial, which cannot be done retrospectively
+> from event logs. The ML layer did not test it either. Read it as a
+> well-evidenced hypothesis about where time is spent, not as a proven lever.
 
 ### Strategic
 
@@ -208,19 +249,39 @@ synthetic.
    4.1× longer than High and holds every 24 h breach in the dataset. Do not
    build an SLA on `priority` until a process owner confirms how it is assigned.
 
-6. **Treat Variant 7 as a separate process, not a variant.** 100% Bugs, 100% L3,
-   mandatory double-pass rework loop, 1.8× the mean. It needs its own workflow,
-   its own SLA, and its own ownership — measuring it as "Variant 7" alongside
-   12 other variants hides that it is a structurally different animal.
+6. **Treat Variants 6 and 7 as separate processes, not variants.** Both are
+   100% L3 by construction. Variant 7 is 1,261 cases at 26.64 h with a mandatory
+   double-pass rework loop; **Variant 6 is a second such process — 718 cases at
+   18.74 h, also 100% L3** (see §5a, added after review). Neither resembles the
+   other 11 variants. They need their own workflow, SLA, and ownership. Measuring
+   them as "Variant 6" and "Variant 7" alongside 11 normal paths hides that they
+   are a different kind of animal.
 
 ### Longer term
 
-The `short_description` field is unused in this analysis and is the natural input
-for the ML layer: a classifier predicting *at intake* whether a ticket will
-become a Variant 7 / L3 Bug would let routing happen before the ~4 h L1 attempt
-is spent, which is where the leverage is. Variant 7's perfect predictability
-from `issue_type = Bug` alone suggests triage rules may capture most of the
-value without ML.
+**The previously proposed ML layer has been built, tested, and rejected on the
+evidence. See [`ML_FINDINGS.md`](ML_FINDINGS.md) for the full write-up.**
+
+> **FALSIFIED — withdrawn 2026-10-01.** This section previously proposed a text
+> classifier over `short_description` to route likely-Variant-7 tickets before the
+> L1 attempt was spent. It does not work, for three independent reasons:
+>
+> 1. **There is no text.** `short_description` holds **8 distinct values** across
+>    31,588 cases (max 21 characters), and is 60.55% redundant with `issue_type`
+>    (NMI 0.6055). A text-only model scores PR-AUC 0.1819.
+> 2. **There is nothing to predict.** `reached_level_3` is an exact function of
+>    variant membership — all 1,979 L3 cases are Variant 6 or Variant 7, and
+>    29,609 cases (93.7%) contain zero positives.
+> 3. **Rules match the model.** A categorical-only model (AUC 0.8408) beats the
+>    full pipeline (AUC 0.8400). Gradient boosting buys ~0.004 AUC over a linear
+>    model on five one-hot columns.
+>
+> A real triage signal would need a genuinely free-text field, which this dataset
+> does not contain.
+
+The intervention itself — routing hard cases earlier — is still sound in principle.
+What changed is the *method*: the leverage is in a transparent lookup rule, not a
+model. See `ml_artifacts/INTERPRETATION.md`.
 
 ---
 
@@ -231,15 +292,74 @@ value without ML.
 | **Satisfaction is capped for 4 variants** | Variant 10, 7, 4 and 2 have max score 3; the other 9 reach 5. Their satisfaction values are censored, so **cross-variant satisfaction comparisons are invalid**. Variant 7's "1.90 vs 3.26" gap is real in direction but the magnitude is not trustworthy. |
 | **`resolver` NULL is structural** | 96,496 rows (39.8%) have no resolver — 100% of `Ticket created`, `Ticket closed`, `Customer feedback received`, 0% of any WIP/assignment event. These are system transitions, not missing data. Do not fill them. |
 | **1 row has a NULL event name** | `INC0305`, 2023-06-14 09:37. Excluded from transition metrics; it has no usable label. |
-| **Variant 7 is perfectly uniform** | 100% occurrence rates across all 1,261 cases, zero variance. Real operational processes do not usually look like this. Confirm the data is not partly synthetic before drawing operational conclusions. |
+| **Variant 7 is structurally deterministic** | 100% Bug, 100% L3, a single fixed 15-event sequence with no deviation across all 1,261 cases. Determinism is in the **sequence, not the timing** — cycle time still varies (sd 13.49 h, range 7.03–56.32). Real processes can be tightly standardised, but this level of uniformity plus Variant 6's identical property should be confirmed with the data owner. See §7a. |
 | **Cycle time includes closed time** | Measured first event → last event, so it includes the `Customer feedback received → Ticket closed` wait (~1.06 h) that may be administrative rather than active work. |
 | **`priority` semantics unverified** | The inversion in §4 is robust but its *cause* is unknown from event logs alone. |
 
 ---
 
-## Corrections to the previous analysis
+## 7a. Is this data real? Unresolved — and it gates every recommendation
+
+*Added after review of the ML layer. This is the most important open question in
+the project and no amount of further analysis can close it.*
+
+Three structural properties are hard to explain as ordinary operational behaviour:
+
+| Observation | Value | Why it matters |
+|---|---|---|
+| Event-count spread within variant | **0 for all 13 variants** | Every case of a variant is exactly the same length. Real cases get cut short, reworked, or abandoned. |
+| Distinct event sequences per variant | **1 for 12 of 13** (Variant 10 has 2) | A variant *is* a sequence, so this is partly definitional — but total uniformity is still unusual. |
+| `priority` as a global time multiplier | intake ×4.59/×5.71, L1 work ×4.34/×5.13, L2 work ×4.50/×5.53 (Medium/Low vs High) | Real triage shifts time between queueing and active work. Multiplying every state by nearly the same factor is what a generator parameterised on `priority` would do. |
+
+Measured in [`sql/05_provenance.sql`](sql/05_provenance.sql); exports in `data/1_*`
+through `data/6_verdict.csv`.
+
+**This is not proof of generation.** A tightly standardised, heavily templated
+service desk could also produce it. The two cannot be distinguished from the log.
+
+**What it gates:**
+
+- Every operational recommendation in §6. If the data is generated, §6 describes
+  the generator's parameters, not a real service desk.
+- The priority inversion in §4 is a *real pattern in the data* either way, but its
+  operational meaning depends entirely on the answer.
+- Nothing in the pipeline or the findings should be presented externally as
+  describing a real process until the data owner confirms this.
+
+**Action required from the data owner, not from analysis:** one question — is
+`Incident_Management_CSV.csv` real operational data or synthetic?
+
+---
+
+## 8. Corrections to the previous analysis
 
 Documented for provenance; the old files are in `archive/`.
+
+Corrections 1–4 are from the first rebuild. Corrections 5–7 are from the ML
+investigation and adversarial review (2026-10-01).
+
+**5. Variant 6 was missing entirely.** The original analysis examined variants for
+slowness and identified only Variant 7. **Variant 6 is also 100% L3** — 718 cases
+at 18.74 h. Because its mean cycle time is unremarkable beside Variant 7's 26.64 h,
+it never registered as an outlier. Together the two variants account for **all
+1,979** L3 cases; the other 29,609 incidents contain zero. See §5a.
+
+**6. "Zero variance" for Variant 7 was wrong.** The determinism is in the *event
+sequence*, not in timing. Cycle time still varies widely: sd **13.49 h**, range
+7.03–56.32 h — more spread than the dataset average. Corrected in §7.
+
+**7. The proposed text classifier was never viable.** §6 previously recommended an
+ML classifier over `short_description`. It has since been built and rejected:
+the field holds 8 distinct values across 31,588 cases. Withdrawn in §6 "Longer
+term". Full account in [`ML_FINDINGS.md`](ML_FINDINGS.md).
+
+**Additionally:** the Strategic recommendation in §6 is now explicitly marked as
+**unvalidated by experiment** (§6 header). It is a descriptive hypothesis about
+where time accumulates, not a proven causal lever.
+
+---
+
+**Earlier corrections:**
 
 **1. Truncated load.** `to_sql(chunksize=5000, method="multi")` committed
 55,000 of 242,901 rows and raised no error. Every published KPI was computed on

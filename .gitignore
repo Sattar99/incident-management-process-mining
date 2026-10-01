@@ -7,6 +7,12 @@ data/
 incidents_clean.csv
 *.parquet
 
+# Trained model artifacts — binary, and fitted on a label (reached_level_3) that
+# is an exact function of process-mining variant membership. Shipping a fitted
+# model for a label that is not learnable would misrepresent the result.
+# Reproduce with: python ml_triage.py
+ml_artifacts/*.pkl
+
 # Generated CI fixtures (recreated by tests/make_fixture.py on every run)
 tests/fixtures/
 
