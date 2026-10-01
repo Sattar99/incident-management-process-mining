@@ -19,7 +19,7 @@ results.
 |---|---|---|
 | 1 | `priority='Low'` → P 0.550 / R 0.985 | **ESTABLISHED** (reproduced exactly from DB) |
 | 2 | "The `slow_24h` model is redundant with the rule" | **SUPPORTED WITH LIMITATIONS** — true conclusion, wrong reason. At matched recall the *rule beats the model*; the model wins only at best-F1. See §A |
-| 3 | The interpretation's precision gloss ("matches on precision, within noise") | **CONTRADICTED BY THE DATA** — not noise. The model is worse than the rule at every matched-recall point tested |
+| 3 | First-pass claim: "matches on precision, within noise" | **CONTRADICTED BY THE DATA** — not noise. The model is worse than the rule at every matched-recall point tested |
 | 4 | `Bug + Low → pre-route` rule is dominated | **ESTABLISHED** — P 0.2273, R 0.2350, reproduced |
 | 5 | Excluding `customer_satisfaction` from intake features | **ESTABLISHED** (correct call) |
 | 6 | Excluding `variant` from production features | **ESTABLISHED** (correct call) |
@@ -51,7 +51,7 @@ Every figure below is recomputed from the database or refit, not taken from eith
 | D8 | "Variant 7 has zero variance" | RESULTS §7 | **Cycle-time std = 13.49 h; mean 26.64** | Zero *structural* variance (event sequence), NOT zero duration variance. Wording invites over-correction |
 | D9 | `short_description` 8 values, max 21 chars | stated | **8 values confirmed** ✓ | But all 18,915 V7 rows carry the single value `Application crash` |
 | D10 | RESULTS §6 "~2 h (~16%) off the median" | 2 h, 16% | **1.48–1.84 h, 11.6–14.5%** | Only reaches 2 h/16% by mixing the *mean* L1 (4.2 h) with a *median* denominator (12.72 h). Overstated |
-| D11 | Interpretation: "HistGB flags 29.5%" | 29.5% | **29.474%** ✓ | Correct |
+| D11 | First-pass interpretation: "HistGB flags 29.5%" | 29.5% | **29.474%** ✓ | Correct |
 | D12 | Within-Low predictive power | "no issue type meaningfully separates them" | **issue_type AUC 0.601; all four together AUC 0.612** | Directionally right; 0.61 is not nothing. Claim should be quantified, not asserted |
 | D13 | Priority dwell-multiplier | not reported | **Intake ×1.88/×3.95, L1 work ×1.89/×3.83 for Med/Low** | The two multipliers agree to within 1%. New evidence — see §F |
 
