@@ -1,40 +1,266 @@
-# Data-Driven Process Insights & Suggestions
+# Data-Driven Process Insights & Recommendations
 
 **Project:** Incident Management Process Optimization (Project #2)
-**Database:** `incident_data` (PostgreSQL)
-**Data Volume:** 242,902 Events across $\approx$ 1000+ Cases
-**Key Metrics Calculated:** Total Cycle Time, Average Step Duration, Total Steps
+**Source:** `Incident_Management_CSV.csv` → PostgreSQL `Incident_Management.incident_data`
+**Volume:** 242,901 events · 31,588 incidents · 13 variants · 2023-01-01 → 2024-01-02
+**Reproduce:** `python etl_pipeline.py && python analytics.py`
 
-##  Performance Summary (All Incidents)
-
-| Metric | Value | Unit | Notes |
-| :--- | :--- | :--- | :--- |
-| **Avg. Total Cycle Time** | 52,462.74 | Seconds | $\approx 14.57$ Hours. Total time from creation to closure. |
-| **Avg. Step Duration** | 7,874.33 | Seconds | $\approx 2.18$ Hours. Average time spent in *one* event/step. |
-| **Avg. Total Steps** | 8.48 | Steps | Average complexity/length of an incident resolution path. |
-| **Max Cycle Time Observed** | 202,740.00 | Seconds | $\approx 56.32$ Hours (Outlier). |
+> **All figures below are computed from the complete, verified 242,901-row load.**
+> The previous version of this document reported figures derived from a
+> truncated 55,000-row table (22.6% of the data). Those numbers were wrong and
+> have been superseded. See *Corrections to the previous analysis* at the end.
 
 ---
 
-##  Top 3 Bottleneck Events (Time Sinks)
+## 1. Performance summary
 
-These are the individual process steps where the average wait/work time is longest, indicating where time is most frequently lost.
+| Metric | Value | Notes |
+|---|---:|---|
+| Incidents | 31,588 | One row per `case_id`, no duplicates |
+| **Mean cycle time** | **15.03 h** | Creation → closure |
+| **Median cycle time** | **12.72 h** | Better SLA target than the mean |
+| p75 cycle time | 19.73 h | |
+| p95 cycle time | 32.48 h | Tail is long |
+| Max cycle time | 56.32 h | Outlier |
+| Mean events per incident | 7.69 | Average path length |
+| Mean distinct resolvers | 2.90 | Excludes NULL (system transitions) |
+| Mean satisfaction | 3.26 | See caveat in §7 |
 
-1.  **Ticket escalated to level 2 support:** **15,710s** (4.36 hrs) - *Highest single event drag.*
-2.  **Level 1 escalates to level 2 support:** **15,239s** (4.23 hrs) - *The primary transition bottleneck.*
-3.  **Ticket solved by level 1 support:** **15,237s** (4.23 hrs) - *The resolution step itself is taking too long.*
+The mean exceeds the median by 2.3 h, so the distribution is right-skewed: a
+minority of very slow incidents pulls the average up. **Use the median (12.72 h)
+as the operational target.**
+
+---
+
+## 2. Where the time actually goes
+
+Total elapsed process time: **474,822 hours** across 211,311 transitions.
+This is the decision-relevant view — mean-per-transition understates states that
+affect nearly every incident.
+
+| State | Total hours | Share | Cases touched |
+|---|---:|---:|---:|
+| `WIP - level 1 support` | 136,570 | **28.8%** | 32,223 |
+| `Ticket created` | 122,783 | **25.9%** | 31,588 |
+| `WIP - level 2 support` | 86,502 | **18.2%** | 21,955 |
+| `Ticket assigned to level 1 support` | 32,076 | 6.8% | 31,250 |
+| `Customer feedback received` | 31,075 | 6.5% | 30,338 |
+
+**Three states hold 72.8% of all process time.** Two of them are *work-in-progress
+queues* and the third is *intake* — the wait between a ticket being created and
+someone picking it up. Nothing in the top five is an escalation event.
+
+Mean dwell time per transition:
+
+| Transition | Mean h | Median h | p95 h | Cases |
+|---|---:|---:|---:|---:|
+| `WIP - level 1 support → Ticket escalated to level 2 support` | 4.36 | 3.88 | 9.28 | 625 |
+| `WIP - level 1 support → Level 1 escalates to level 2 support` | 4.23 | 3.82 | 8.93 | 18,215 |
+| `WIP - level 1 support → Ticket solved by level 1 support` | 4.23 | 3.82 | 9.01 | 11,475 |
+| `WIP - level 2 support → Level 2 escalates to level 3 support` | 3.98 | 3.62 | 8.67 | 1,979 |
+| `Ticket created → Ticket assigned to level 1 support` | 3.88 | 3.43 | 8.60 | 30,625 |
+
+The pattern is unambiguous: **~4 hours of L1 work per attempt**, then ~1 hour per
+subsequent hand-off. The cost is in attempt duration, not in hand-offs.
 
 ---
 
-##  Data-Driven Recommendations (The "Why" & "How")
+## 3. Escalation is the dominant driver
 
-### Strategic Recommendation (The Executive Pitch)
-> "The primary friction in our incident resolution process lies in the **escalation and subsequent resolution phases**. The transition from Level 1 to Level 2 support consumes an average of **4.36 hours**. To improve our overall SLA adherence, the highest ROI move is to **reduce the average time spent in the 'Escalation' events by 30%**."
+| Escalated | Incidents | Share | Mean cycle h | Median h | Satisfaction |
+|---|---:|---:|---:|---:|---:|
+| No | 12,747 | 40.35% | 11.53 | 9.50 | 3.41 |
+| **Yes** | **18,841** | **59.65%** | **17.40** | **14.17** | **3.16** |
 
-### Tactical Recommendations (The Implementation Plan)
-1.  **Targeted Automation:** Focus immediate engineering efforts on the **`Level 1 escalates to level 2 support`** event. Can we build an ML classifier to predict if a L1 agent will fail within the first 2 hours, and automatically push it to L2 without human intervention?
-2.  **Service Level Agreement (SLA) Monitoring:** Implement dashboards to monitor **`Ticket solved by level 1 support`** duration. If this step exceeds 5 hours, flag the case immediately for a managerial review.
-3.  **Feature Parity:** Since `Bug` tickets are the longest running ($\approx 57k$s cycle time), prioritize optimizing the L2/L3 workflow specifically for Bug reports, as these are currently the most costly incidents.
+Escalated incidents take **51% longer** and score 0.25 points lower.
+
+Escalation rate by issue type — Bug behaves completely differently:
+
+| Issue type | Incidents | Escalation rate | Reaches L3 | Mean h (no esc.) | Mean h (esc.) |
+|---|---:|---:|---:|---:|---:|
+| Performance Issue | 8,128 | **76.4%** | 1.3% | 11.49 | 16.35 |
+| Incident | 4,463 | 58.8% | 2.5% | 11.54 | 16.75 |
+| Technical Issue | 1,515 | 58.5% | 2.8% | 12.15 | 16.50 |
+| Maintenance | 1,558 | 57.8% | 2.8% | 11.30 | 17.13 |
+| Feature Request | 6,118 | 57.8% | 2.0% | 11.45 | 16.96 |
+| Service Request | 3,002 | 56.9% | 2.0% | 11.35 | 16.48 |
+| **Bug** | **6,804** | **43.8%** | **21.9%** | 11.59 | **21.59** |
+
+Two distinct regimes:
+
+- **Performance Issues escalate most (76.4%) but resolve quickly when they do** (16.35 h). They escalate and come back.
+- **Bugs escalate least (43.8%) but go to L3 far more (21.9%) and take 21.59 h.** When a Bug escalates it tends to stay escalated.
+
+A single "escalation" metric hides this. **Bug escalation should be tracked as a separate SLA.**
 
 ---
-*Data sourced from `incident_data` table.*
+
+## 4. Priority is inverted — lower priority, longer resolution
+
+| Priority | Incidents | Mean h | Median h | Over 24 h | Satisfaction |
+|---|---:|---:|---:|---:|---:|
+| **Low** | 9,348 | **25.76** | 25.07 | **55.0%** | 3.25 |
+| Medium | 15,774 | 12.28 | 11.93 | 0.5% | 3.26 |
+| High | 6,466 | **6.23** | 6.05 | **0.0%** | 3.26 |
+
+Low-priority incidents take **4.1× longer** than High, and **55% of them breach
+24 hours while no High-priority incident ever does.**
+
+I checked whether this was an artefact of Bug concentration. It is not:
+
+- Priority mix is near-identical across all 7 issue types (~30% Low, ~20% High).
+- Within **Bugs alone**: Low 27.28 h · Medium 12.96 h · High 6.56 h.
+- Within **Variant 7 alone**: Low 45.03 h · Medium 21.63 h · High 10.54 h.
+- The ordering is identical in every variant tested.
+
+**Interpretation:** priority in this dataset is not tracking urgency. Either it
+is assigned *after* the fact (when an incident is already known to be hard), or
+Low is a holding bucket that never gets worked. Satisfaction is flat across
+priority (3.25–3.26), which is what you would expect if the customer never
+perceives the priority label — only the wait.
+
+This is the highest-leverage question in the dataset and it cannot be resolved
+from event logs alone. It needs a process owner to confirm how `priority` is
+set.
+
+---
+
+## 5. Variant 7 is a distinct failure mode
+
+| | Variant 7 | All others |
+|---|---:|---:|
+| Incidents | 1,261 | 30,327 |
+| Mean cycle h | **26.64** | 14.55 |
+| Median cycle h | **22.25** | 12.50 |
+| Mean events | **15.0** | 7.39 |
+| Mean resolvers | 6.53 | — |
+| Reaches L3 | **100%** | 2.37% |
+| Issue type | **100% Bug** | Mixed |
+| Mean satisfaction | 1.90 | 3.26 |
+
+Variant 7 is not a normal path with a longer tail — it is a **closed loop
+specific to Bugs**. All 1,261 incidents are Bugs, and all of them reach L3.
+
+Its 11-step sequence, with dwell times (present in 100% of cases):
+
+| # | Transition | Mean h | Occurrences |
+|---:|---|---:|---:|
+| 1 | `WIP - level 1 support → Level 1 escalates to level 2 support` | **4.28** | 1,261 |
+| 2 | `WIP - level 2 support → Level 2 escalates to level 3 support` | **3.98** | **2,522** |
+| 3 | `Ticket created → Ticket assigned to level 1 support` | **3.95** | 1,261 |
+| 4 | `Customer feedback received → Ticket closed` | 1.06 | 1,261 |
+| 5–11 | All remaining hand-offs | 1.03–1.05 | 1,261–2,522 |
+
+Four events occur **exactly twice** in every single case (2,522 occurrences /
+1,261 cases):
+
+- `Level 2 escalates to level 3 support`
+- `WIP - level 3 support`
+- `Ticket assigned to level 2 support`
+- `WIP - level 2 support`
+
+This is a **mandatory rework cycle**: every Variant 7 Bug is escalated to L3,
+then bounced *back* to L2 for a second pass, then closed. It is 100% consistent
+across all 1,261 incidents — no variance at all, which is unusual in real
+operational data and suggests the process is at least partly deterministic or
+synthetic.
+
+**The three long steps average 4.12 h across 2,522 transitions, contributing
+8.23 h per incident — 30.9% of the 26.64 h average.**
+
+---
+
+## 6. Recommendations
+
+### Strategic
+
+> Cycle time is not lost at escalation — it is accumulated in the **L1 work queue**
+> and in **intake**. Three states hold 72.8% of all elapsed time, and every
+> escalation attempt costs ~4.2 h of L1 effort before handing off. The highest-ROI
+> intervention is therefore **not** faster escalation but **shorter L1 attempts and
+> faster first assignment**: every incident waits 3.89 h in `Ticket created` before
+> first assignment, and `WIP - level 1` accounts for 28.8% of all process time.
+> Cutting intake latency by 1 h and L1 attempt time by 20% would remove roughly
+> 2 h (~16%) from the median incident.
+
+### Tactical
+
+1. **Attack intake first.** Every one of the 31,588 incidents waits in
+   `Ticket created` before first assignment, averaging 3.89 h (median 3.43 h).
+   The state alone is 25.9% of all process time. Auto-assign on intake by
+   product area or reporter. Cheapest win available.
+
+2. **Set a WIP limit on the L1 queue.** `WIP - level 1 support` is 28.8% of all
+   time. A WIP limit forces work to be finished before new work is accepted,
+   which is the standard remedy for exactly this queueing pattern.
+
+3. **Alert on the ~4.2 h L1 attempt.** Every transition *out of*
+   `WIP - level 1 support` averages 4.24 h (p95 = 8.97 h). Flag any L1 case still
+   open after 4 h — that threshold catches the majority of stalled work, and the
+   p95 shows roughly 1 in 20 will run to 9 h.
+
+4. **Separate Bug escalation from Performance Issue escalation.** They are
+   different problems: Performance Issues escalate fast and return (76.4% → 16.35 h),
+   Bugs escalate slow and stay (43.8% → 21.59 h, 21.9% reach L3). One combined
+   escalation metric hides both.
+
+5. **Investigate the priority inversion before acting on it.** Low priority takes
+   4.1× longer than High and holds every 24 h breach in the dataset. Do not
+   build an SLA on `priority` until a process owner confirms how it is assigned.
+
+6. **Treat Variant 7 as a separate process, not a variant.** 100% Bugs, 100% L3,
+   mandatory double-pass rework loop, 1.8× the mean. It needs its own workflow,
+   its own SLA, and its own ownership — measuring it as "Variant 7" alongside
+   12 other variants hides that it is a structurally different animal.
+
+### Longer term
+
+The `short_description` field is unused in this analysis and is the natural input
+for the ML layer: a classifier predicting *at intake* whether a ticket will
+become a Variant 7 / L3 Bug would let routing happen before the ~4 h L1 attempt
+is spent, which is where the leverage is. Variant 7's perfect predictability
+from `issue_type = Bug` alone suggests triage rules may capture most of the
+value without ML.
+
+---
+
+## 7. Caveats — read before using these numbers
+
+| Caveat | Detail |
+|---|---|
+| **Satisfaction is capped for 4 variants** | Variant 10, 7, 4 and 2 have max score 3; the other 9 reach 5. Their satisfaction values are censored, so **cross-variant satisfaction comparisons are invalid**. Variant 7's "1.90 vs 3.26" gap is real in direction but the magnitude is not trustworthy. |
+| **`resolver` NULL is structural** | 96,496 rows (39.8%) have no resolver — 100% of `Ticket created`, `Ticket closed`, `Customer feedback received`, 0% of any WIP/assignment event. These are system transitions, not missing data. Do not fill them. |
+| **1 row has a NULL event name** | `INC0305`, 2023-06-14 09:37. Excluded from transition metrics; it has no usable label. |
+| **Variant 7 is perfectly uniform** | 100% occurrence rates across all 1,261 cases, zero variance. Real operational processes do not usually look like this. Confirm the data is not partly synthetic before drawing operational conclusions. |
+| **Cycle time includes closed time** | Measured first event → last event, so it includes the `Customer feedback received → Ticket closed` wait (~1.06 h) that may be administrative rather than active work. |
+| **`priority` semantics unverified** | The inversion in §4 is robust but its *cause* is unknown from event logs alone. |
+
+---
+
+## Corrections to the previous analysis
+
+Documented for provenance; the old files are in `archive/`.
+
+**1. Truncated load.** `to_sql(chunksize=5000, method="multi")` committed
+55,000 of 242,901 rows and raised no error. Every published KPI was computed on
+22.6% of the data.
+
+| Metric | Published | Correct |
+|---|---:|---:|
+| Avg cycle time | 52,462.74 s (14.57 h) | **54,114.39 s (15.03 h)** |
+| Avg step duration | 7,874.33 s (2.18 h) | **8,125.20 s (2.26 h)** |
+| Avg total steps | 8.48 | **7.69** |
+| Max cycle time | 202,740 s | 202,740 s ✓ |
+
+**2. Backwards bottleneck attribution.** `LAG()` labelled each wait with the
+*following* event, so "Ticket escalated to level 2 support — 4.36 h" was actually
+time spent in `WIP - level 1 support`. This produced a materially wrong
+recommendation: "reduce time spent in escalation events by 30%" targets the
+hand-offs (~1 h each) rather than the L1 work that precedes them (~4.2 h).
+
+**3. Inflated resolver counts.** Filling NULL `resolver` with the literal
+`"Unknown"` added one distinct resolver per affected case — Variant 7 read
+**7.53** instead of **6.53**.
+
+**4. Wrong scale.** "≈1000+ Cases" understated the true 31,588 by ~30×. The
+table was also named `incident_events` in the README but is `incident_data`.

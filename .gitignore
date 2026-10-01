@@ -7,6 +7,9 @@ data/
 incidents_clean.csv
 *.parquet
 
+# Generated CI fixtures (recreated by tests/make_fixture.py on every run)
+tests/fixtures/
+
 # Python
 __pycache__/
 *.py[cod]

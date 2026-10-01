@@ -1,0 +1,106 @@
+name: CI
+
+# Verifies the ETL -> SQL -> tests chain on every push and pull request.
+#
+# The raw 28 MB dataset is git-ignored, so CI generates a small fixture with the
+# identical schema (tests/make_fixture.py) and loads that. The tests that matter
+# most -- database/source parity -- are exercised against whatever dataset is
+# loaded, so a truncated COPY fails the build here exactly as it would in
+# production.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: ETL + analytics + tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: Incident_Management
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      PGHOST: localhost
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: Incident_Management
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Wait for PostgreSQL
+        # Uses the already-installed psycopg2 rather than pg_isready, which is
+        # not guaranteed to be present on the runner image.
+        run: |
+          python - <<'PY'
+          import os, time
+          import psycopg2
+          for i in range(30):
+              try:
+                  psycopg2.connect(
+                      host=os.environ["PGHOST"],
+                      port=os.environ["PGPORT"],
+                      user=os.environ["PGUSER"],
+                      password=os.environ["PGPASSWORD"],
+                      dbname=os.environ["PGDATABASE"],
+                  ).close()
+                  print("PostgreSQL is ready")
+                  raise SystemExit(0)
+              except psycopg2.OperationalError as exc:
+                  print(f"waiting for postgres... ({i + 1}/30): {exc}")
+                  time.sleep(2)
+          raise SystemExit("PostgreSQL did not become ready in time")
+          PY
+
+      - name: Generate fixture dataset
+        run: |
+          python tests/make_fixture.py --out "$RUNNER_TEMP/sample_incidents.csv"
+          echo "INCIDENT_RAW_FILE=$RUNNER_TEMP/sample_incidents.csv" >> "$GITHUB_ENV"
+
+      - name: Run ETL
+        run: python etl_pipeline.py --raw "$INCIDENT_RAW_FILE"
+
+      - name: Run analytics (all SQL reports)
+        run: python analytics.py
+
+      - name: Upload report exports
+        uses: actions/upload-artifact@v4
+        with:
+          name: report-exports
+          path: data/
+          retention-days: 14
+
+      - name: Run tests
+        run: python -m pytest tests/ -v

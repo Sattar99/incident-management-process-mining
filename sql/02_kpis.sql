@@ -85,6 +85,40 @@ GROUP BY escalated
 ORDER BY escalated;
 
 
+-- Cycle time and SLA breach by priority --------------------------------------
+-- Counterintuitive but robust: LOWER priority means LONGER cycle time.
+-- The priority mix is near-identical across issue types (~30% Low / 20% High
+-- everywhere), so this is not confounding by issue type; the same ordering
+-- holds within Bugs alone and within every individual variant.
+SELECT
+    priority,
+    COUNT(*)                                                        AS incidents,
+    ROUND(AVG(cycle_time_hours)::numeric, 2)                        AS mean_cycle_hours,
+    ROUND(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY cycle_time_hours)::numeric, 2)
+                                                                    AS median_cycle_hours,
+    ROUND(100.0 * COUNT(*) FILTER (WHERE cycle_time_hours > 24) / COUNT(*), 2)
+                                                                    AS pct_over_24h,
+    ROUND(AVG(customer_satisfaction)::numeric, 2)                    AS mean_satisfaction
+FROM v_case_metrics
+GROUP BY priority
+ORDER BY mean_cycle_hours DESC;
+
+
+-- Where the elapsed time actually sits ---------------------------------------
+-- Absolute hours are the decision-relevant view: the three states below hold
+-- ~73% of all process time.
+SELECT
+    from_event,
+    ROUND(SUM(duration_hours), 0)                                    AS total_hours,
+    ROUND(100.0 * SUM(duration_hours) / SUM(SUM(duration_hours)) OVER (), 1)
+                                                                    AS pct_of_all_time,
+    ROUND(AVG(duration_hours)::numeric, 3)                          AS mean_hours,
+    COUNT(DISTINCT case_id)                                          AS cases
+FROM v_transition_metrics
+GROUP BY from_event
+ORDER BY total_hours DESC;
+
+
 -- The 10 slowest incidents ---------------------------------------------------
 SELECT
     case_id,

@@ -1,44 +1,253 @@
-# Irish Economy Data Platform: Incident Process Optimization Pipeline
+# Irish Economy Data Platform — Project 2: Incident Process Optimization
 
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Project Status](https://img.shields.io/badge/Status-Analysis%20Complete-brightgreen.svg)](https://github.com/your-username/irish-economy-platform)
-[![Python Version](https://img.shields.io/badge/Python-3.11.6-orange.svg)](https://www.python.org/downloads/release/python-3116/)
+Automated pipeline that turns a raw incident event log into a tested, queryable
+process-mining model and a set of evidence-backed recommendations.
 
-## Overview
+**Status:** Analysis complete, pipeline tested and reproducible.
+**Scope:** 242,901 events · 31,588 incidents · 13 process variants · 2023-01-01 → 2024-01-02
+**Stack:** Python 3.11 · pandas · PostgreSQL 18 · SQL · Power BI (target)
 
-This repository houses the end-to-end data pipeline built to automate the monitoring and optimization of the Irish Incident Management workflow. Instead of manually tracking spreadsheet data, this system pulls raw event logs, transforms them into a structured, time-sequenced process, and provides quantifiable Key Performance Indicators (KPIs) to drive business decisions.
+---
 
-**Goal:** Transform raw data into an actionable intelligence layer, proving the ability to move from **Data Analyst $\rightarrow$ Data Engineer $\rightarrow$ AI Analyst**.
+## Architecture
 
-## Architecture Diagram (Conceptual)
+```
+Incident_Management_CSV.csv   (28 MB raw event log, semicolon-delimited)
+        │
+        │  etl_pipeline.py — parse, validate, load
+        ▼
+PostgreSQL  Incident_Management.incident_data   (242,901 rows, verified)
+        │
+        │  sql/01_views.sql — metric contract
+        ▼
+   v_case_metrics          one row per incident
+   v_transition_metrics    one row per state transition
+        │
+        │  analytics.py — execute sql/*.sql, export CSV
+        ▼
+   data/*.csv  (17 exports)  ──►  Power BI dashboards
+        │
+        │  tests/test_pipeline.py — 17 assertions
+        ▼
+   Regression guard rails
+```
 
-The pipeline follows a classic modern data stack pattern:
+PostgreSQL is the single source of truth. The CSVs in `data/` are exports for
+BI and inspection, not intermediate artifacts.
 
-`Raw Data (CSV) $\xrightarrow{\text{ETL (Pandas/SQL)}} \text{Data Warehouse (PostgreSQL)} \xrightarrow{\text{Analytics (SQL/Python)}} \text{BI Visualization (Power BI)} \xrightarrow{\text{AI Layer (Agent)}} \text{Actionable Insight}$`
+---
 
-## Key Achievements
+## Layout
 
-*   **Automated Ingestion:** Reads `Incident_Management_CSV.csv` using Python/Pandas.
-*   **Persistence:** Loads and structures 242k+ events into a PostgreSQL database (`incident_events`).
-*   **Process Sequencing:** Chronologically orders every event within each `Case ID` to map the true flow.
-*   **Performance KPI Calculation:** Calculates **Total Cycle Time** and **Average Step Duration** per incident.
-*   **Bottleneck Identification:** Pinpointed the most time-consuming events via SQL aggregation.
-*   **AI Readiness:** The process is fully prepared for NLP/ML classification (e.g., classifying incoming tickets before they enter the flow).
+| Path | Purpose |
+|---|---|
+| `etl_pipeline.py` | Raw CSV → PostgreSQL + `incidents_clean.csv`. Validates and verifies load parity. |
+| `analytics.py` | Executes `sql/*.sql`, writes `data/*.csv`. |
+| `sql/01_views.sql` | `v_case_metrics`, `v_transition_metrics` — the metric contract. |
+| `sql/02_kpis.sql` | Headline KPIs, breakdowns, escalation impact, priority/SLA. |
+| `sql/03_bottlenecks.sql` | Transition bottlenecks, Variant 7 deep-dive, rework loops. |
+| `sql/04_data_quality.sql` | Quantified source-data defects. |
+| `tests/test_pipeline.py` | 18 assertions: load parity, metric correctness, known defects. |
+| `tests/make_fixture.py` | Generates the small CI dataset (real source is git-ignored). |
+| `.github/workflows/ci.yml` | ETL → SQL → tests on every push/PR. |
+| `requirements.txt` | Pinned runtime + test dependencies. |
+| `incidents_clean.csv` | Case-level export (31,588 rows). Generated. |
+| `data/` | Report exports. Generated, git-ignored. |
+| `archive/` | Superseded notebooks and `.pgsql` files, kept for provenance. |
 
-## Technologies Used
+---
 
-*   **Core Language:** Python 3.11.6
-*   **Data Handling:** Pandas
-*   **Data Persistence:** PostgreSQL (via SQLAlchemy)
-*   **Analytics Engine:** SQL
-*   **Visualization Target:** Power BI
-*   **Intelligence:** Hermes Agent (Future)
+## How to run
 
-## How to Run This Project
+**Prerequisites:** PostgreSQL running locally, reachable on `localhost:5432`.
 
-1.  **Prerequisites:** Ensure PostgreSQL is running locally and accessible.
-2.  **Clone Repository:** `git clone [Your-Repo-URL]`
-3.  **Install Dependencies:** `pip install pandas sqlalchemy psycopg2-binary`
-4.  **Configure DB:** Update the `DB_CONNECTION_STRING` in the main script to match your credentials.
-5.  **Run ETL:** Execute the Python script (`etl_pipeline.py`).
-6.  **Analyze:** Connect Power BI directly to the `incident_data` database and use the metrics in `RESULTS_AND_SUGGESTIONS.md` to guide dashboard design.
+```bash
+pip install pandas sqlalchemy psycopg2-binary pytest
+```
+
+Connection settings come from standard `PG*` environment variables
+(`PGUSER`, `PGPASSWORD`, `PGHOST`, `PGPORT`, `PGDATABASE`). Defaults:
+`postgres` / `0000` / `localhost` / `5432` / `Incident_Management`.
+
+```bash
+python etl_pipeline.py     # 1. load 242,901 rows + write incidents_clean.csv
+python analytics.py        # 2. build views, run all SQL, write data/*.csv
+python -m pytest tests/ -v # 3. verify (17 tests)
+```
+
+Each stage is independent. `analytics.py --sql 03_bottlenecks.sql` runs a single
+report. `etl_pipeline.py --skip-load` regenerates the CSV without touching the
+database.
+
+> **Ordering note:** `etl_pipeline.py` drops and recreates `incident_data` with
+> `CASCADE`, which also drops the reporting views. Always run `analytics.py`
+> (or `sql/01_views.sql`) after a reload. The test suite recreates the views
+> itself, so tests pass either way.
+
+---
+
+## Data model
+
+`incident_data` — one row per event.
+
+| Column | Type | Notes |
+|---|---|---|
+| `event_id` | bigserial | Surrogate key |
+| `case_id` | text | 31,588 distinct |
+| `variant` | text | Process path, 13 distinct |
+| `priority` | text | High / Medium / Low |
+| `reporter` | text | |
+| `event_timestamp` | timestamp | Source format `DD/MM/YYYY HH:MM` |
+| `event` | text | 18 distinct; 1 NULL (see Known data defects) |
+| `issue_type` | text | 7 distinct |
+| `resolver` | text | NULL on 96,496 rows — structural, not missing |
+| `report_channel` | text | App / Email / Website / Phone |
+| `short_description` | text | Free text |
+| `customer_satisfaction` | integer | 1–5, capped at 3 for some variants |
+
+**Views**
+
+- `v_case_metrics` — one row per incident: cycle time, event/resolver counts,
+  step-duration percentiles, escalation and completion flags.
+- `v_transition_metrics` — one row per observed transition `A -> B`, with the
+  time spent in `A`.
+
+---
+
+## Timing methodology
+
+This is the one methodological decision that matters, and it was wrong in the
+earlier version of this project.
+
+The original `Bottleneck_Identification.pgsql` used `LAG(timestamp)` and then
+labelled the resulting interval with the event that came **after** the wait. So
+"Ticket escalated to level 2 support — 4.36 hrs" was really reporting time
+spent in **WIP - level 1 support** before the escalation.
+
+Process mining measures time in a state as the interval from that state to the
+**next** event, so attribution must be forward-looking:
+
+```
+step_seconds       = next_timestamp - timestamp     (time spent in the current state)
+cycle_time_seconds = last_event    - first_event    (per incident)
+```
+
+Both views implement this. Consequence: the real bottlenecks are **WIP states
+and intake**, not escalation events.
+
+---
+
+## Findings
+
+Full detail and evidence in [`RESULTS_AND_SUGGESTIONS.md`](RESULTS_AND_SUGGESTIONS.md).
+
+| Metric | Value |
+|---|---|
+| Incidents | 31,588 |
+| Mean cycle time | 15.03 h |
+| Median cycle time | 12.72 h |
+| p95 cycle time | 32.48 h |
+| Mean events per incident | 7.69 |
+
+Headlines:
+
+1. **72.8% of all elapsed time sits in three states** — `WIP - level 1 support`
+   (28.8%), `Ticket created` (25.9%), `WIP - level 2 support` (18.2%).
+2. **Escalation is the dominant driver** — escalated incidents average 17.40 h
+   vs 11.53 h for those that never escalate (+51%), and 59.7% escalate.
+3. **Priority is inverted** — `Low` priority averages 25.76 h vs `High` at
+   6.23 h. Holds within every issue type and every variant, so it is not
+   confounding.
+4. **Variant 7 is a distinct failure mode** — 1,261 incidents, 100% Bugs, 100%
+   reach L3, mean 26.64 h (1.8× the rest), satisfaction capped at 3.
+
+---
+
+## Known data defects
+
+Quantified in `sql/04_data_quality.sql`. These are properties of the source
+data, documented so the metrics are read correctly:
+
+| Defect | Extent | Handling |
+|---|---|---|
+| NULL `event` name | 1 row (`INC0305`) | Excluded from `v_transition_metrics`; test asserts exactly 1 |
+| NULL `resolver` | 96,496 rows (39.8%) | Structural — system transitions have no owner. **Not** filled with a placeholder |
+| Satisfaction capped at 3 | 4 variants (5,035 incidents) | Cross-variant satisfaction comparisons are not valid |
+| Out-of-order timestamps | 0 | Asserted |
+
+On the `resolver` point specifically: an earlier notebook filled NULLs with the
+literal `"Unknown"`, which inflated `COUNT(DISTINCT resolver)` by one per
+affected case — Variant 7 read **7.53** resolvers instead of the correct
+**6.53**. The current pipeline leaves NULLs as NULL.
+
+---
+
+## CI
+
+`.github/workflows/ci.yml` runs on every push and pull request to `main`:
+installs dependencies → waits for a PostgreSQL 16 service container → generates
+a fixture dataset → runs the ETL → runs all SQL reports → runs the tests. Report
+exports are attached as a build artifact.
+
+The real 28 MB source is git-ignored, so CI uses a **generated fixture**
+(`tests/make_fixture.py`) with the identical schema and delimiter. It reproduces
+the awkward cases on purpose — a NULL event name, NULL resolvers on system
+transitions, an L3 rework loop, capped satisfaction scores — so the edge-case
+handling is genuinely exercised.
+
+The tests that matter most are the **parity** assertions, which compare the
+database against whatever file was loaded rather than against hardcoded totals.
+That is what makes CI meaningful here: a truncated `COPY` fails the build in the
+same way it silently corrupted production metrics. Absolute-scale assertions
+(242,901 rows / 31,588 cases) only run against the real dataset and skip on CI.
+
+```bash
+# Reproduce the CI sequence locally
+python tests/make_fixture.py --out /tmp/fixture.csv
+INCIDENT_RAW_FILE=/tmp/fixture.csv python etl_pipeline.py --raw /tmp/fixture.csv
+INCIDENT_RAW_FILE=/tmp/fixture.csv python analytics.py
+INCIDENT_RAW_FILE=/tmp/fixture.csv python -m pytest tests/ -v
+```
+
+---
+
+## Testing
+
+```bash
+python -m pytest tests/ -v
+```
+
+18 assertions covering source parsing, load parity, per-case completeness, and
+metric correctness (the SQL views are cross-checked against an independent
+pandas computation).
+
+These exist because of a specific failure. An earlier
+`to_sql(chunksize=5000, method="multi")` load died partway and committed
+**55,000 of 242,901 rows** without raising. Every KPI in the project was then
+computed on 22.6% of the data for two days. `test_db_row_count_matches_source`
+and `test_no_case_is_partially_loaded` exist specifically to make that failure
+loud; both were confirmed to fail against a deliberately truncated table.
+
+The load itself now uses a single transactional `COPY`, so a failure leaves the
+table empty rather than half-populated, and parity is verified before and after.
+
+---
+
+## Power BI
+
+Connect to `Incident_Management` → `v_case_metrics` (incident grain) and
+`v_transition_metrics` (transition grain). Suggested visuals:
+
+- Median cycle time by variant (bar) — exposes the Variant 7 outlier
+- Cycle time distribution by priority (histogram with a 24 h SLA line)
+- Total hours by state (bar) — the 72.8% concentration
+- Escalation rate by issue type (bar) — Bug diverges at 43.8% escalation / 21.9% L3
+- Variant 7 transition heat map — the 11-step loop with a double L3 pass
+
+Use import mode; the views are small (31,588 and 211,311 rows).
+
+---
+
+## License
+
+MIT

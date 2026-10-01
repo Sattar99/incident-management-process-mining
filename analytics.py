@@ -58,31 +58,36 @@ def run_file(engine, path: Path) -> list[tuple[str, pd.DataFrame]]:
     """
     raw = path.read_text(encoding="utf-8")
 
-    # Map each statement to its label: the FIRST comment line of the block
-    # immediately above it (later lines in the block are explanatory prose).
+    # Each statement is labelled by the FIRST comment line of the comment block
+    # directly above it. Only the very first block in a file (before any blank
+    # line) is treated as a file header rather than a query label.
     labelled: list[tuple[str, str]] = []
     label = path.stem
     buf: list[str] = []
     pending: list[str] = []
-    # A leading comment block (before any SQL) is the file header, not a label.
-    saw_sql = False
+    in_header = True
     for line in raw.splitlines():
         stripped = line.strip()
+        if not stripped:
+            if buf:
+                labelled.append((label, "\n".join(buf)))
+                buf = []
+            if in_header:
+                in_header = False      # blank line ends the file header
+            pending = []
+            continue
         if stripped.startswith("--"):
             if buf:
                 labelled.append((label, "\n".join(buf)))
                 buf = []
-            if saw_sql:
-                comment = stripped.lstrip("-").strip()
-                if comment:
-                    pending.append(comment)
+            comment = stripped.lstrip("-").strip()
+            if comment:
+                pending.append(comment)
             continue
-        if stripped:
-            saw_sql = True
-            if not buf:
-                label = pending[0] if pending else label
-            pending = []
-            buf.append(line)
+        if not buf:
+            label = pending[0] if pending else label
+        pending = []
+        buf.append(line)
     if buf:
         labelled.append((label, "\n".join(buf)))
 

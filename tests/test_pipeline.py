@@ -8,6 +8,10 @@ metrics computed on 22.6% of the data. Nothing errored.
 
 Run with:
     python -m pytest tests/ -v
+
+On CI (see .github/workflows/ci.yml) the 28 MB source is absent, so
+INCIDENT_RAW_FILE points at a fixture from tests/make_fixture.py and the
+absolute-scale assertions skip while the parity assertions still run.
 """
 
 from __future__ import annotations
@@ -33,12 +37,23 @@ from etl_pipeline import (  # noqa: E402
     validate_source,
 )
 
-RAW_PATH = ROOT / RAW_FILE
+RAW_PATH = Path(os.environ.get("INCIDENT_RAW_FILE") or (ROOT / RAW_FILE))
+
+# The real 28 MB source is git-ignored and absent on CI runners. When a
+# generated fixture is used instead, the absolute-scale assertions are skipped
+# and the parity assertions compare the fixture against the database, which is
+# the property that actually matters.
+USING_FIXTURE = os.environ.get("INCIDENT_RAW_FILE") is not None
+
+REAL_ROW_COUNT = 242_901
+REAL_CASE_COUNT = 31_588
 
 
 @pytest.fixture(scope="module")
 def events() -> pd.DataFrame:
     if not RAW_PATH.exists():
+        if USING_FIXTURE:
+            pytest.fail(f"fixture declared via INCIDENT_RAW_FILE but not found: {RAW_PATH}")
         pytest.skip(f"{RAW_FILE} not found")
     return load_raw(RAW_PATH)
 
@@ -80,9 +95,15 @@ def test_timestamps_all_parse(events):
 
 
 def test_expected_row_count(events):
-    """Guards against a truncated read of the 28MB source file."""
-    assert len(events) == 242_901
-    assert events["case_id"].nunique() == 31_588
+    """Guards against a truncated read of the 28MB source file.
+
+    Only meaningful against the real dataset; CI runs on a generated fixture of
+    a different size and is covered by the parity tests below instead.
+    """
+    if USING_FIXTURE:
+        pytest.skip("fixture dataset - absolute scale does not apply")
+    assert len(events) == REAL_ROW_COUNT
+    assert events["case_id"].nunique() == REAL_CASE_COUNT
 
 
 def test_source_validation_passes(events):
@@ -98,6 +119,18 @@ def test_case_dimensions_are_constant(events):
     for col in ("variant", "issue_type", "priority", "report_channel"):
         varying = events.groupby("case_id")[col].nunique().gt(1).sum()
         assert varying == 0, f"{varying} cases have multiple {col} values"
+
+
+def test_satisfaction_is_constant_per_case(events):
+    """v_case_metrics groups by customer_satisfaction.
+
+    If a case carried two different scores it would produce two rows for one
+    incident and silently corrupt every case-grain metric (cycle time averages,
+    incident counts). Holds for all 31,588 cases in the real dataset; this test
+    exists because the CI fixture generator got it wrong first.
+    """
+    varying = events.groupby("case_id")["customer_satisfaction"].nunique(dropna=True).gt(1).sum()
+    assert varying == 0, f"{varying} cases have multiple satisfaction values"
 
 
 def test_no_negative_cycle_times(events):
@@ -133,7 +166,9 @@ def test_db_timestamp_range_matches_source(db, events):
 def test_db_variant_count_matches_source(db, events):
     with db.connect() as conn:
         n = conn.execute(text(f"SELECT count(DISTINCT variant) FROM {DB_TABLE}")).scalar()
-    assert n == events["variant"].nunique() == 13
+    assert n == events["variant"].nunique()
+    if not USING_FIXTURE:
+        assert n == 13
 
 
 def test_no_case_is_partially_loaded(db, events):
@@ -188,13 +223,27 @@ def test_transition_view_excludes_null_events(db):
     assert n == 0
 
 
-def test_known_null_event_is_accounted_for(db):
-    """INC0305 has one NULL event name; it must be documented, not silently dropped."""
+def test_null_event_rows_are_documented_not_dropped(db, events):
+    """NULL event names must reach the table and be excluded from the view.
+
+    Note: in the raw CSV the bad cell is empty, which pandas reads as NaN and
+    astype('string') turns into '' (not pd.NA). load_raw therefore reports 0
+    NaN even though the COPY writes a genuine SQL NULL. The database is
+    therefore the source of truth for this count, and we assert the documented
+    value plus that the view filtered it out.
+    """
     with db.connect() as conn:
         nulls = conn.execute(
             text("SELECT count(*) FROM incident_data WHERE event IS NULL")
         ).scalar()
+        leaked = conn.execute(
+            text("SELECT count(*) FROM v_transition_metrics WHERE from_event IS NULL")
+        ).scalar()
+
+    # The real dataset has exactly one such row (INC0305); the CI fixture
+    # injects one deliberately.
     assert nulls == 1
+    assert leaked == 0   # and it must never reach the transition metrics
 
 
 def test_resolver_nulls_are_structural(db):
