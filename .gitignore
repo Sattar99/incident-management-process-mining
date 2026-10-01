@@ -1,0 +1,34 @@
+# Large raw datasets - not suitable for version control
+Incident_Management_CSV.csv
+*.csv.gz
+data/
+
+# Generated ETL outputs
+incidents_clean.csv
+*.parquet
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.ipynb_checkpoints/
+*.egg-info/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+
+# Env & secrets
+.env
+.env.*
+!.env.example
+*.pem
+secrets.yml
