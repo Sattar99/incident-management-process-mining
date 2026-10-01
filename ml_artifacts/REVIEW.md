@@ -1,13 +1,15 @@
-# ODIN — Independent Adversarial Review
+# Self-Review: Methodology Critique and Corrections
 
-**Reviewer:** ODIN · **Date:** 2026-10-01
+**Date:** 2026-10-01
 **Artifacts read:** `ml_triage.py`, `ml_artifacts/metrics.json`, `ml_artifacts/run_log.txt`,
 `ml_artifacts/INTERPRETATION.md`, `RESULTS_AND_SUGGESTIONS.md`, `etl_pipeline.py`, git log.
-**Independent verification:** 9 read-only queries against `Incident_Management.incident_data`
-(242,901 rows / 31,588 cases, re-confirmed), plus a refit of the `slow_24h` LogReg on the same
-chronological split (reproduced AUC **0.9326**, matching metrics.json exactly).
+**Scope:** read-only re-derivation of every figure in the ML layer against
+`Incident_Management.incident_data` — 9 read-only queries (242,901 rows / 31,588 cases,
+re-confirmed), plus a refit of the `slow_24h` LogReg on the same chronological split (reproduced
+AUC **0.9326**, matching metrics.json exactly).
 **Standing:** the project holds itself to strict evidence standards after the 22.6% truncation
-episode. That standard is applied here to *both* specialists, including the negative results.
+episode. That standard is applied here to *every stage of the analysis*, including the negative
+results.
 
 ---
 
@@ -17,14 +19,14 @@ episode. That standard is applied here to *both* specialists, including the nega
 |---|---|---|
 | 1 | `priority='Low'` → P 0.550 / R 0.985 | **ESTABLISHED** (reproduced exactly from DB) |
 | 2 | "The `slow_24h` model is redundant with the rule" | **SUPPORTED WITH LIMITATIONS** — true conclusion, wrong reason. At matched recall the *rule beats the model*; the model wins only at best-F1. See §A |
-| 3 | Hercules's precision gloss ("matches on precision, within noise") | **CONTRADICTED BY THE DATA** — not noise. The model is worse than the rule at every matched-recall point tested |
+| 3 | The interpretation's precision gloss ("matches on precision, within noise") | **CONTRADICTED BY THE DATA** — not noise. The model is worse than the rule at every matched-recall point tested |
 | 4 | `Bug + Low → pre-route` rule is dominated | **ESTABLISHED** — P 0.2273, R 0.2350, reproduced |
 | 5 | Excluding `customer_satisfaction` from intake features | **ESTABLISHED** (correct call) |
 | 6 | Excluding `variant` from production features | **ESTABLISHED** (correct call) |
 | 7 | "Intake features" framing (fields known *at* intake) | **PLAUSIBLE BUT UNVERIFIED** — staticness is equally consistent with backfill. §C |
 | 8 | Headline `AUC 0.84` for `reached_level_3` | **CONTRADICTED BY THE DATA as a generalisable result** — `reached_level_3` is an *exact function of variant*. §D |
 | 9 | "L3 is not actionable" / "escalation is a definition problem" | **SUPPORTED WITH LIMITATIONS** — directionally right, stated too absolutely. §E |
-| 10 | Variant 7 is partly synthetic | **SUPPORTED WITH LIMITATIONS** — but for a *different and larger* reason than either specialist gave. §F |
+| 10 | Variant 7 is partly synthetic | **SUPPORTED WITH LIMITATIONS** — but for a *different and larger* reason than either the model layer or the first-pass interpretation gave. §F |
 | 11 | Priority-inversion rediscovery = "genuine cross-check" | **WEAK EVIDENCE** — substantially circular. §E |
 | 12 | Recommended next analysis: priority-provenance audit | **UNSUPPORTED as specified** — the log structurally cannot answer it. §F |
 | 13 | ML layer was a defensible use of effort | **SUPPORTED WITH LIMITATIONS** — yes, but with a sequencing indictment. §G |
@@ -41,15 +43,15 @@ Every figure below is recomputed from the database or refit, not taken from eith
 |---|---|---|---|---|
 | D1 | Low / Medium / High breach counts | 5,144 / 80 / 0 | **5,144 / 80 / 0** ✓ | Reproduced exactly |
 | D2 | Rule precision / recall | 0.550 / 0.985 | **0.5503 / 0.9847** ✓ | 5,144 / 9,348; 5,144 / 5,224 |
-| D3 | **Rule F1 — never computed by either specialist** | — | **0.7060** | **Model best-F1 F1 = 0.7172. The model wins F1 by 1.1 pts.** Hercules compares only P and R |
+| D3 | **Rule F1 — never computed in the first pass** | — | **0.7060** | **Model best-F1 F1 = 0.7172. The model wins F1 by 1.1 pts.** The first pass compares only P and R |
 | D4 | "matches on precision (0.550 vs 0.578, within noise)" | "within noise" | **At the rule's own recall (0.979) the model scores P = 0.4665** | The gap is 8.3 precision points *in the rule's favour*. Not noise — the opposite sign |
-| D5 | **Variant 6 L3 rate — not reported by anyone** | — | **718 of 718 = 100.0%** | Variant 6 is a *second* 100%-L3 variant. Both specialists analysed only V7 |
-| D6 | "Outside Variant 7: 718 of 30,327 reach L3" | treated as diffuse residual | **All 718 are Variant 6. Zero non-V7 L3 outside Variant 6** | Hercules's "718/yr spread across 30,327 tickets" is wrong in kind: it is one homogeneous deterministic cluster |
+| D5 | **Variant 6 L3 rate — not reported anywhere** | — | **718 of 718 = 100.0%** | Variant 6 is a *second* 100%-L3 variant. Neither the model layer nor the first-pass interpretation looked past V7 |
+| D6 | "Outside Variant 7: 718 of 30,327 reach L3" | treated as diffuse residual | **All 718 are Variant 6. Zero non-V7 L3 outside Variant 6** | The "718/yr spread across 30,327 tickets" framing is wrong in kind: it is one homogeneous deterministic cluster |
 | D7 | Excluding V7 → base rate 2.33%, AUC 0.61 | "too small to matter" | **Excluding V7 *and* V6: n = 29,609, L3 positives = 0** | The target is not rare-and-hard. It is **exhaustively enumerated** |
 | D8 | "Variant 7 has zero variance" | RESULTS §7 | **Cycle-time std = 13.49 h; mean 26.64** | Zero *structural* variance (event sequence), NOT zero duration variance. Wording invites over-correction |
 | D9 | `short_description` 8 values, max 21 chars | stated | **8 values confirmed** ✓ | But all 18,915 V7 rows carry the single value `Application crash` |
 | D10 | RESULTS §6 "~2 h (~16%) off the median" | 2 h, 16% | **1.48–1.84 h, 11.6–14.5%** | Only reaches 2 h/16% by mixing the *mean* L1 (4.2 h) with a *median* denominator (12.72 h). Overstated |
-| D11 | Hercules: "HistGB flags 29.5%" | 29.5% | **29.474%** ✓ | Correct |
+| D11 | Interpretation: "HistGB flags 29.5%" | 29.5% | **29.474%** ✓ | Correct |
 | D12 | Within-Low predictive power | "no issue type meaningfully separates them" | **issue_type AUC 0.601; all four together AUC 0.612** | Directionally right; 0.61 is not nothing. Claim should be quantified, not asserted |
 | D13 | Priority dwell-multiplier | not reported | **Intake ×1.88/×3.95, L1 work ×1.89/×3.83 for Med/Low** | The two multipliers agree to within 1%. New evidence — see §F |
 
@@ -58,7 +60,7 @@ addressed before publication.**
 
 ---
 
-## TECHNICAL REVIEW (ARTEMIS)
+## TECHNICAL REVIEW — THE ML IMPLEMENTATION
 
 **The engineering is genuinely strong and I am not going to manufacture doubt about it.**
 Reproducing the LogReg refit to 4 decimal places from the raw database, the leakage contract
@@ -81,7 +83,7 @@ is better practice than most portfolio work.
 `variant` — has **exactly zero intra-case variation across all 31,588 cases.** I verified this for
 all seven. Staticness is evidence that a value is *written once*. It is **not** evidence that it is
 written *at t₀*. A column backfilled after case closure is equally static. `priority` is not
-special here; it is in exactly the same epistemic position as `issue_type`, and Artemis treats one
+special here; it is in exactly the same epistemic position as `issue_type`, and the write-up treats one
 as intake-available and the other as post-hoc suspect. That inconsistency matters, because the
 whole `slow_24h` result is a re-derivation of `priority` — so if `priority` is backfilled, the
 model's 0.93 AUC is measuring a post-outcome field, and the leakage analysis has a hole in it at
@@ -99,9 +101,10 @@ inflates the appearance of a rich temporal block. Four of six temporal features 
 
 ## THE CIRCULARITY PROBLEM — the finding that changes the picture
 
-Artemis already flagged the oracle (variant → AUC 1.0000) as an upper bound. Hercules correctly
-says the oracle proves circularity. **Both understate it, because neither checked whether
-`reached_level_3` has any variance left once you remove the two deterministic variants.**
+The model layer already flagged the oracle (variant → AUC 1.0000) as an upper bound, and the
+interpretation correctly says the oracle proves circularity. **Both understate it, because neither
+step checked whether `reached_level_3` has any variance left once you remove the two
+deterministic variants.**
 
 I checked. Per-variant L3 rates:
 
@@ -113,9 +116,9 @@ all 11 others  29,609 cases        0 L3     0.0%
 
 **`reached_level_3` is not a stochastic outcome. It is an exact function of process-mining variant
 membership.** Excluding Variants 6 and 7 leaves **29,609 cases and zero positives** — a base rate
-of exactly 0.0000. Hercules reports the intermediate number (exclude V7 → 718 cases) and calls it
-a "diffuse residual spread across 30,327 tickets." It is not diffuse. It is **one variant, 718
-cases, 100% positive**, i.e. the same deterministic structure as V7, one tier down.
+of exactly 0.0000. The first pass reports the intermediate number (exclude V7 → 718 cases) and
+calls it a "diffuse residual spread across 30,327 tickets." It is not diffuse. It is **one variant,
+718 cases, 100% positive**, i.e. the same deterministic structure as V7, one tier down.
 
 Three consequences:
 
@@ -133,17 +136,18 @@ Three consequences:
 
 ---
 
-## INTERPRETATION REVIEW (HERCULES)
+## INTERPRETATION REVIEW
 
-### Where he is right, and right for better reasons than he gives
+### Where the conclusion holds, and for better reasons than the write-up gives
 
-**The decisive claim is verified and his conclusion is, if anything, understated.** I recomputed
+**The decisive claim is verified and the conclusion is, if anything, understated.** I recomputed
 `priority='Low'` → P **0.5503** / R **0.9847** on all 31,588 cases. Reproduced exactly. The
 `slow_24h` model is not deployable. That is the right conclusion.
 
-**But the comparison as framed is not fair, and it does not favour him.** He compares the rule at
-**29.6% flags** against the model at **27.6% flags** — different review budgets — and then reports
-the precision gap as "within noise." It is not noise, and I checked at matched operating points:
+**But the comparison as framed is not fair, and it does not favour the conclusion.** The first pass
+compares the rule at **29.6% flags** against the model at **27.6% flags** — different review
+budgets — and then reports the precision gap as "within noise." It is not noise, and I checked at
+matched operating points:
 
 | Comparison | Rule | Model | Winner |
 |---|---:|---:|---|
@@ -153,15 +157,15 @@ the precision gap as "within noise." It is not noise, and I checked at matched o
 | **Precision @ flag rate 0.3012 (rule's budget)** | **0.5494** | **0.5494** | **Tie** |
 
 So: the model is genuinely better at its own chosen operating point, and the rule is genuinely
-better once you hold recall fixed. Hercules reports only the first comparison and calls the
+better once you hold recall fixed. The first pass reports only the first comparison and calls the
 precision gap "within noise." **That is the wrong characterisation, and it happens to understate
-his own case** — at matched recall the rule wins by 8.3 points, not 0. He should have said "the
-rule dominates at matched recall" instead of "matches on precision."
+the redundancy case** — at matched recall the rule wins by 8.3 points, not 0. The honest
+statement is "the rule dominates at matched recall," not "matches on precision."
 
-### Where he is overconfident
+### Where the interpretation is overconfident
 
 **"Escalation is a definition problem, not a prediction problem."** Overstated. AUC 0.640/0.648
-against a 59.65% base rate is weak, and his "flags 87–89% of tickets" point is fair — but
+against a 59.65% base rate is weak, and the "flags 87–89% of tickets" point is fair — but
 "no decision content" is an inference about *the business*, dressed as an inference about *the
 data*. The data shows a weak-but-real signal (PR-AUC 0.7365 vs 0.5965 base rate, lift 1.24). The
 correct statement is: **escalation is a weak target at a base rate that makes thresholded action
@@ -169,7 +173,7 @@ expensive.** Whether it has decision content depends on whether escalating costs
 which is not in the data. Note also that a 59.65% "escalation rate" in a support process is itself
 a finding worth escalating to the process owner, not a target to delete.
 
-**"L3 is not actionable."** Right conclusion, wrong supporting argument. He grounds it on "718
+**"L3 is not actionable."** Right conclusion, wrong supporting argument. It is grounded on "718
 cases a year spread across 30,327 tickets" — but as shown, those 718 are Variant 6, a single
 100%-positive deterministic variant. So L3 is not *unactionable*; it is **fully enumerable by
 variant membership**, which is a stronger and more useful statement. Handle V6 the way RESULTS §6
@@ -195,7 +199,7 @@ dataset contains a priority/slowness association*, which was never in doubt.
 (short_description, issue_type) pair — `Application crash`/`Bug` — across 18,915 rows, 100% L3, and
 satisfaction capped at 3.
 
-**What does not survive: "zero variance."** RESULTS §7 and Hercules both lean on this. Cycle-time
+**What does not survive: "zero variance."** RESULTS §7 and the interpretation both lean on this. Cycle-time
 std within V7 is **13.49 h** on a mean of 26.64 h (CV ≈ 0.51). Gap std per step is 0.19–3.02 h.
 **There is substantial duration variation.** The uniformity is *structural* (which events occur),
 not *temporal* (how long they take). This matters in both directions: it weakens the "looks
@@ -203,7 +207,7 @@ generated" case somewhat, and it means RESULTS §7's phrasing ("zero variance") 
 to be embarrassing — V7 has *more* duration variance than the dataset overall (Low std 8.05 h on
 mean 25.76 vs V7 13.49 on 26.64).
 
-**The decisive point neither specialist made.** I decomposed dwell time by priority:
+**The decisive point neither stage surfaced.** I decomposed dwell time by priority:
 
 | Priority | Intake wait (h) | L1 work (h) | Intake ×High | Work ×High |
 |---|---:|---:|---:|---:|
@@ -228,9 +232,9 @@ project is reproducible and re-runnable, which is the actual deliverable.
 
 ## THE RECOMMENDED NEXT ANALYSIS — IT CANNOT BE ANSWERED
 
-**Hercules's priority-provenance audit is the right question and the wrong instrument.** He says
-explicitly it will work "from the event log's own structure" by reconstructing "label-assignment
-timestamp." **There is no such timestamp.** I enumerated every column:
+**The proposed priority-provenance audit is the right question and the wrong instrument.** It says
+explicitly it will work "from the event log's own structure" by reconstructing
+"label-assignment timestamp." **There is no such timestamp.** I enumerated every column:
 
 ```
 event_id, case_id, variant, priority, reporter, event_timestamp, event,
@@ -239,14 +243,14 @@ issue_type, resolver, report_channel, short_description, customer_satisfaction
 
 One time column, `event_timestamp`, one value per event. There is no `priority_set_at`, no audit
 table, no revision history — and `priority` has zero intra-case variation, so there is nothing to
-reconstruct *from*. His H1 test ("if assignment always precedes first L1 contact, and never follows
+reconstruct *from*. Its H1 test ("if assignment always precedes first L1 contact, and never follows
 it") is **untestable**: with a single static column there is no assignment event to order against
-anything. His own probe ("priority never varies within a case") is evidence that the audit is
-impossible, and he reads it as evidence for the hypothesis.
+anything. Its own probe ("priority never varies within a case") is evidence that the audit is
+impossible, and it reads it as evidence for the hypothesis.
 
 **So: is this unfalsifiable optimism dressed as rigour? Partly.** The framing promises "it uses only
-what the log contains" — it does not. He is right that a non-ML analysis is the correct next step,
-and right that it must precede the rule. He is wrong that this one can be done. Presenting an
+what the log contains" — it does not. It is right that a non-ML analysis is the correct next step,
+and right that it must precede the rule. It is wrong that this one can be done. Presenting an
 unrunnable analysis as "the deliverable that matters," with "a few SQL queries against data already
 loaded" as its cost, is the most misleading sentence in INTERPRETATION.md.
 
@@ -264,7 +268,7 @@ loaded" as its cost, is the most misleading sentence in INTERPRETATION.md.
 
 ## IS THE ML LAYER DEFENSIBLE? (SEQUENCING, BLUNTLY)
 
-**Yes, and Hercules is right to say so — but his framing is too comfortable.** The layer produced a
+**Yes — and that judgement is right, but the framing around it is too comfortable.** The layer produced a
 genuine negative: 8 boilerplate strings, no text to model. Negative results are worth having, and
 the discipline of running a proper chronological split and reporting ablations made the negative
 *conclusive* rather than speculative. That is real value.
@@ -275,9 +279,10 @@ from event logs alone." The ML layer was then built with `priority` as an input 
 strongest result was rediscovering that inversion. **The decisive question was asked in §4 and
 left open; the ML layer spent its effort re-deriving an answer already in hand.** What would have
 been worth building first: anything that attacked the V6/V7 determinism, which I found in one
-query and which was missed by two specialists and a 998-line script.
+query and which was missed by both the model layer and the interpretation, and by a 998-line
+script.
 
-**The honest framing for the README:** not "we tried ML and it didn't work," but "we established
+**The honest framing for the README:** not "I tried ML and it didn't work," but "I established
 that the `short_description` ML layer cannot be built, and in doing so surfaced that
 `reached_level_3` is exactly the set {Variant 6, Variant 7} — which is a more useful finding than
 the model would have been."
@@ -286,7 +291,7 @@ the model would have been."
 
 ## WHAT MUST CHANGE BEFORE PUBLICATION
 
-**Must be corrected (factual errors that will not survive review):**
+**Must be corrected (factual errors that will not survive scrutiny):**
 
 1. **Variant 6 is missing from the entire project.** 718 cases, 100% L3, 18.74 h mean. RESULTS §5
    and §6 recommendation 6 must add it. This is the biggest omission found.
@@ -321,8 +326,8 @@ the model would have been."
 10. **"Genuine cross-check" framing** for the priority rediscovery. It is substantially circular —
     `priority` was a model input.
 11. **Any implication that `Bug + Low → pre-route` is a usable rule** (P 0.2273, R 0.2350).
-12. **The `short_description` classifier proposal** (RESULTS §6 "Longer term"). Strike it — correct
-    call by Hercules, and he is right for the right reason.
+12. **The `short_description` classifier proposal** (RESULTS §6 "Longer term"). Strike it — the
+    interpretation reached that call, and for the right reason.
 13. **The saved `.pkl` model files.** They are fitted on a label that is a deterministic function of
     variant membership. Shipping them invites someone to load and deploy. Either delete or add a
     prominent README warning.
@@ -345,9 +350,10 @@ the model would have been."
   "drop it" recommendation is a business call, not a data call.
 - **Cycle-time regression R² 0.683** — established as a measurement, but note it is substantially
   `priority` and the duration features in disguise.
-- **The intake-fixing recommendation** — untested by ML, not refuted. Rests on the process analysis
-  alone. Note the discomfort Hercules correctly flags: temporal features carry no duration signal,
-  so the intake queue may not be congestion-driven the way a WIP-limit fix assumes. **The D13
+- **The intake-fixing recommendation** — untested by ML, not refuted. Rests on the process
+  analysis alone. Note the discomfort the interpretation correctly flags: temporal features carry
+  no duration signal, so the intake queue may not be congestion-driven the way a WIP-limit fix
+  assumes. **The D13
   result strengthens that discomfort considerably** — intake wait scales with priority at the same
   rate as work, which is not what a congested queue looks like.
 
@@ -374,5 +380,5 @@ would have caught the truncation — plus one clean negative result and one alar
 ---
 
 *Review conducted read-only. No existing file was modified; no git operation was performed.
-One file written: `ml_artifacts/REVIEW.md`. All figures independently recomputed against
+This file is the only one written. All figures independently recomputed against
 `Incident_Management` (242,901 rows / 31,588 cases) or refit from source.*

@@ -69,7 +69,7 @@ BI and inspection, not intermediate artifacts.
 | `ml_artifacts/metrics.json` | Every metric from the ML run, including all six ablations. |
 | `ml_artifacts/run_log.txt` | Full console output of the training run. |
 | `ml_artifacts/INTERPRETATION.md` | First-pass interpretation of the ML results. |
-| `ml_artifacts/REVIEW.md` | Independent adversarial review of that interpretation. |
+| `ml_artifacts/REVIEW.md` | Self-review: read-only re-derivation of every figure in that interpretation, and the corrections it forced. |
 | `ml_artifacts/*.png`, `*.csv` | ROC/PR curves, confusion matrices, feature importance, permutation importance. |
 | `ml_artifacts/*.pkl` | Fitted models. Reproduction artifacts only — **not deployable**, fitted on a label that is a function of `variant`. |
 | `archive/` | Superseded notebooks and `.pgsql` files, kept for provenance. |
@@ -186,7 +186,7 @@ Headlines:
 4. **Variant 7 is a distinct failure mode** — 1,261 incidents, 100% Bugs, 100%
    reach L3, mean 26.64 h (1.8× the rest), satisfaction capped at 3.
 5. **Variant 6 is a second 100%-L3 variant** — 718 incidents, every one reaches L3,
-   mean 18.74 h. Found during the ML investigation; see below.
+   mean 18.74 h. Missed by the original analysis, caught in the ML layer; see below.
 
 ---
 

@@ -1,6 +1,5 @@
 # ML Triage Layer — Analytical Interpretation
 
-**Author:** HERCULES (Analytical Intelligence)
 **Date:** 2026-10-01
 **Subject:** Business interpretation of `ml_artifacts/metrics.json` + `run_log.txt` (run 2026-10-01T02:51:09)
 **Scope:** Interpretation only. No model code written, no files modified, no repository changes.
@@ -14,17 +13,17 @@
 
 ---
 
-## 0. Verification of Artemis's reported numbers
+## 0. Re-derivation of the reported numbers
 
-All figures in the brief were checked against `metrics.json` and `run_log.txt`. **No
-numeric discrepancies found.** Values confirmed: L3 base rate 1,979/31,588 = 6.265%; LogReg
+All figures were checked against `metrics.json` and `run_log.txt`, and against the database.
+**No numeric discrepancies found.** Values confirmed: L3 base rate 1,979/31,588 = 6.265%; LogReg
 0.8400/0.4029; HistGB 0.8438/0.3769, Brier 0.0405; stratified-random AUC 0.4989; split
 delta +0.0056; escalated 0.6400/0.7019 and 0.6481/0.7365; slow_24h 0.9326/0.6235 and
 0.9304/0.6395, operating point P 0.578 / R 0.945 / 27.6% flagged; regressor MAE 3.59 h,
 R² 0.683, Spearman 0.815, baseline MAE 7.04 h; all six ablation rows; Variant 7
 1,261 cases / 63.72% of L3 positives; categorical-only 0.8408 > full 0.8400.
 
-Three qualifications the brief's framing slightly obscures:
+Three qualifications the first-pass framing slightly obscures:
 
 1. **`short_description` is not merely "boilerplate" — it is fully redundant with
    `issue_type`.** NMI = 0.6055, and the cross-tab shows near-deterministic mapping
@@ -196,10 +195,10 @@ produced one useful cross-check and zero deployable models.**
 
 ## 4. Evaluation of "ship a rule, not a model"
 
-Artemis recommends a transparent lookup rule instead of the ML layer. **The recommendation
-is correct in direction and should be accepted — but it is under-specified in a way that
-matters, and the specific rule he proposes ("Bug + Low priority → pre-route") is the wrong
-rule for the wrong target.**
+The case for a transparent lookup rule instead of the ML layer is sound. **It is correct in
+direction and should be accepted — but it is under-specified in a way that matters, and the
+specific rule it proposes ("Bug + Low priority → pre-route") is the wrong rule for the wrong
+target.**
 
 ### 4.1 Testing the proposed rule
 
@@ -209,7 +208,7 @@ model it replaces** on the modeler's own metric — it flags 2,046 tickets to ca
 escalations where the model catches 660 of 1,979 from 2,500 flags. Worse, the rule fires
 on 465/2,046 = 22.7% precision while the model achieves 50.4%.
 
-**INFERRED: Artemis's example rule should be rejected on its own terms.** He proposes it
+**INFERRED: the example rule should be rejected on its own terms.** It is proposed
 for routing (pre-route to L2), not for L3 prediction, so it is not strictly
 like-for-like — but as an L3-triage rule it is clearly dominated.
 
@@ -227,13 +226,13 @@ conditions to `priority='Low'` cannot raise recall (already 98.5%) and only cost
 
 ### 4.3 Failure modes of the rules approach
 
-Stated plainly, because Artemis's framing understates these:
+Stated plainly, because the framing understates these:
 
 1. **The rule encodes a bug as a feature.** It says "Low priority → will breach SLA."
    RESULTS §4 already flags the inversion as possibly an assignment artifact. **If the
-   inversion is fixed, this rule becomes actively harmful** — it will keep fast-tracking
-   exactly the tickets that have become genuinely low-priority. *This is the most serious
-   failure mode and Artemis's recommendation does not mention it.*
+ inversion is fixed, this rule becomes actively harmful** — it will keep fast-tracking
+ exactly the tickets that have become genuinely low-priority. *This is the most serious
+ failure mode and the recommendation does not mention it.*
 2. **Coverage ceiling.** 288 breaches/yr escape. If any breach carries contractual
    penalty, that residual matters and needs a human queue, not a bigger model.
 3. **Maintenance is not zero.** Not "no maintenance" — different maintenance. A rule's
@@ -377,7 +376,7 @@ modelling. There are 8 distinct strings. There is nothing to model.
 - `slow_24h`'s value was as an independent rediscovery of the priority inversion —
   corroboration of RESULTS §4 by separate method.
 - Temporal features carry no duration signal; arrival time does not predict duration.
-- Artemis's proposed `Bug + Low → pre-route` rule is dominated by the model it would
+- The proposed `Bug + Low → pre-route` rule is dominated by the model it would
   replace (P 0.227 vs 0.504).
 - A one-condition `priority='Low'` rule is near-optimal; no issue-type split separates
   breaches within Low (44–55%).

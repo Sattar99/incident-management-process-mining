@@ -168,10 +168,10 @@ synthetic.
 **The three long steps average 4.12 h across 2,522 transitions, contributing
 8.23 h per incident — 30.9% of the 26.64 h average.**
 
-## 5a. Variant 6 is a second deterministic L3 process — added after review
+## 5a. Variant 6 is a second deterministic L3 process — added after the ML layer
 
-*This section was not in the original analysis. It was found during adversarial
-review of the ML layer, and it corrects an omission in §5.*
+*This section was not in the original analysis. It turned up when I went back over the ML
+layer and cross-checked it against the variant table, and it corrects an omission in §5.*
 
 | | Variant 6 | Variant 7 | All others |
 |---|---:|---:|---:|
@@ -254,7 +254,7 @@ variants for *slowness*; this one is only anomalous on the L3 axis.
 6. **Treat Variants 6 and 7 as separate processes, not variants.** Both are
    100% L3 by construction. Variant 7 is 1,261 cases at 26.64 h with a mandatory
    double-pass rework loop; **Variant 6 is a second such process — 718 cases at
-   18.74 h, also 100% L3** (see §5a, added after review). Neither resembles the
+   18.74 h, also 100% L3** (see §5a). Neither resembles the
    other 11 variants. They need their own workflow, SLA, and ownership. Measuring
    them as "Variant 6" and "Variant 7" alongside 11 normal paths hides that they
    are a different kind of animal.
@@ -302,7 +302,7 @@ model. See `ml_artifacts/INTERPRETATION.md`.
 
 ## 7a. Is this data real? Unresolved — and it gates every recommendation
 
-*Added after review of the ML layer. This is the most important open question in
+*Added during the ML layer. This is the most important open question in
 the project and no amount of further analysis can close it.*
 
 Three structural properties are hard to explain as ordinary operational behaviour:
@@ -338,7 +338,7 @@ service desk could also produce it. The two cannot be distinguished from the log
 Documented for provenance; the old files are in `archive/`.
 
 Corrections 1–4 are from the first rebuild. Corrections 5–7 are from the ML
-investigation and adversarial review (2026-10-01).
+investigation and my own re-check of it (2026-10-01).
 
 **5. Variant 6 was missing entirely.** The original analysis examined variants for
 slowness and identified only Variant 7. **Variant 6 is also 100% L3** — 718 cases

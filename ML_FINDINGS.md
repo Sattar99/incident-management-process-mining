@@ -156,8 +156,8 @@ WHERE priority = 'Low'
 | Logistic regression | 0.5775 @ best-F1 | 0.9450 @ best-F1 |
 
 The rule's counts: 5,144 of 9,348 Low-priority cases breach 24 h; 5,144 of 5,224 total breaches are
-Low (the other 80 are Medium; **zero** are High). Two honest qualifications, both from
-`ml_artifacts/REVIEW.md`:
+Low (the other 80 are Medium; **zero** are High). Two honest qualifications, both from my own re-check of
+the run (`ml_artifacts/REVIEW.md`):
 
 - The model *does* win at its own chosen operating point — best-F1 0.7172 versus the rule's 0.7060,
   a 1.1-point margin.
@@ -328,8 +328,8 @@ Dwelling time by priority, from `v_transition_metrics`:
 If priority were a triage *decision* — someone deprioritising a ticket and leaving it queued —
 intake wait would rise while work time stayed flat. **Both rise by the same factor.** For Medium the
 two multipliers agree to 0.1%. For Low they agree to 3.1% (3.949 vs 3.828) — close, but not the
-within-1% figure quoted in `ml_artifacts/REVIEW.md`, which appears to use a slightly different
-aggregation of L1 work.
+within-1% figure quoted in `ml_artifacts/REVIEW.md`, which used a slightly different
+aggregation of L1 work. My number is the one to use; the discrepancy is aggregation, not arithmetic.
 
 This is the signature of `priority` acting as a **time multiplier** rather than a behavioural signal
 about queueing. It is a second, independent reason to take the provenance question in §6 seriously
@@ -419,7 +419,7 @@ over. Full detail in `RESULTS_AND_SUGGESTIONS.md` ("Corrections to the previous 
    left alone.
 4. **Wrong scale and wrong table name.** "≈1000+ cases" understated 31,588 by ~30×; the table was
    documented as `incident_events` when it is `incident_data`.
-5. **An over-strong comparison, corrected in this layer.** An earlier write-up of the `slow_24h` work
+5. **An over-strong comparison, corrected in this layer.** My own first-pass write-up of the `slow_24h` work
    described the precision gap between the model and the `priority='Low'` rule as "within noise". It
    is not noise — at matched recall the rule leads by 8.3 precision points, the opposite sign. Now
    reported as a matched-operating-point comparison (§3.3).
