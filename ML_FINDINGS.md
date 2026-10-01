@@ -233,7 +233,7 @@ the same 100%-L3 structure one tier down:
 | Mean resolvers | 6.53 | 5.26 | — |
 | Issue type | 100% Bug | all 7 types | mixed |
 | `short_description` | 1 value | all 8 values | mixed |
-| Mean satisfaction | 1.90 (censored at 3) | 3.47 (**not censored**) | 3.49 |
+| Mean satisfaction | 1.90 (censored at 3) | 3.47 (**not censored**) | 3.31 |
 
 Variant 6 is *not* a Bug loop. It spans every issue type and every description. Its signature is
 purely structural: a fixed nine-transition path (`Ticket created → assigned L1 → WIP L1 → escalate
@@ -351,7 +351,7 @@ that keeps it open:
   distinct event sequence (`string_agg` over events ordered by timestamp — 1 distinct signature for
   12 variants, 2 for Variant 10, where a single case of 606 omits a `WIP - level 1 support` state).
   Event count has zero variance within Variant 6 (10 for all 718) and within Variant 7 (15 for all
-  1,261). Per-case gap standard deviations within Variant 7 are 0.19–3.02 h.
+  1,261). Per-case gap standard deviations within Variant 7 are 0.29–3.44 h (mean 1.53).
 - **`priority` multiplies dwell times almost identically** for intake and for work (§5.2).
 - **Two variants are 100% L3 and eleven are 0% L3.** No overlap anywhere.
 
@@ -384,7 +384,7 @@ ML work and it cannot be closed with the data available.
 | Satisfaction censored for 4 variants | Variants 2, 4, 7, 10 max out at 3 vs 5 elsewhere (5,035 incidents). Cross-variant satisfaction comparison is invalid. Variant 6 is **not** censored (max 5, mean 3.47). |
 | `resolver` NULL on 96,496 rows (39.8%) | Structural — system transitions have no owner. Not missing data, and deliberately not filled with a placeholder. |
 | 1 NULL event name | `INC0305`, 2023-06-14 09:37. Excluded from transition metrics; a test asserts exactly 1. |
-| Cycle time includes closure wait | First event → last event, so it includes the ~1.06 h `Customer feedback received → Ticket closed` gap, which may be administrative. |
+| Cycle time includes closure wait | First event → last event, so it includes the `Customer feedback received → Ticket closed` gap (1.02 h dataset-wide across 27,188 transitions; 1.06 h within Variant 7), which may be administrative. |
 | "Zero variance" is wrong wording for Variant 7 | Its *event sequence* is deterministic; its cycle-time standard deviation is **13.49 h** on a mean of 26.64 (CV ≈ 0.51) — more duration variance than the dataset overall (Low: 8.05 h on 25.76). Structural uniformity is not temporal uniformity. |
 | Priority-inversion cause unknown | Robust in the data, unexplained by it. |
 

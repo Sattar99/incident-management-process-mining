@@ -175,8 +175,8 @@ review of the ML layer, and it corrects an omission in §5.*
 
 | | Variant 6 | Variant 7 | All others |
 |---|---:|---:|---:|
-| Incidents | 718 | 1,261 | 29,608 |
-| Mean cycle h | **18.74** | **26.64** | 14.55 |
+| Incidents | 718 | 1,261 | 29,609 |
+| Mean cycle h | **18.74** | **26.64** | 14.45 |
 | Reaches L3 | **100%** | **100%** | 0% |
 | Mean events | 10 | 15 | 7.39 |
 | Mandatory rework loop | No | Yes | No |
@@ -222,7 +222,9 @@ variants for *slowness*; this one is only anomalous on the L3 axis.
 > faster first assignment**: every incident waits 3.89 h in `Ticket created` before
 > first assignment, and `WIP - level 1` accounts for 28.8% of all process time.
 > Cutting intake latency by 1 h and L1 attempt time by 20% would remove roughly
-> 2 h (~16%) from the median incident.
+> 1.8 h — about **12–15%** of cycle time (1.85 h against the 12.72 h median, or
+> 12.3% against the 15.03 h mean). The earlier "2 h (~16%)" figure mixed a
+> mean-based saving with a median denominator and overstated the result.
 
 ### Tactical
 
@@ -293,7 +295,7 @@ model. See `ml_artifacts/INTERPRETATION.md`.
 | **`resolver` NULL is structural** | 96,496 rows (39.8%) have no resolver — 100% of `Ticket created`, `Ticket closed`, `Customer feedback received`, 0% of any WIP/assignment event. These are system transitions, not missing data. Do not fill them. |
 | **1 row has a NULL event name** | `INC0305`, 2023-06-14 09:37. Excluded from transition metrics; it has no usable label. |
 | **Variant 7 is structurally deterministic** | 100% Bug, 100% L3, a single fixed 15-event sequence with no deviation across all 1,261 cases. Determinism is in the **sequence, not the timing** — cycle time still varies (sd 13.49 h, range 7.03–56.32). Real processes can be tightly standardised, but this level of uniformity plus Variant 6's identical property should be confirmed with the data owner. See §7a. |
-| **Cycle time includes closed time** | Measured first event → last event, so it includes the `Customer feedback received → Ticket closed` wait (~1.06 h) that may be administrative rather than active work. |
+| **Cycle time includes closed time** | Measured first event → last event, so it includes the `Customer feedback received → Ticket closed` wait (1.02 h dataset-wide across 27,188 transitions; 1.06 h within Variant 7) that may be administrative rather than active work. |
 | **`priority` semantics unverified** | The inversion in §4 is robust but its *cause* is unknown from event logs alone. |
 
 ---
